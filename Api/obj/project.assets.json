@@ -33,6 +33,42 @@
             "related": ".pdb;.xml"
           }
         }
+      },
+      "VanBora.Application/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v9.0",
+        "dependencies": {
+          "VanBora.Domain": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/VanBora.Application.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/VanBora.Application.dll": {}
+        }
+      },
+      "VanBora.Domain/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v9.0",
+        "compile": {
+          "bin/placeholder/VanBora.Domain.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/VanBora.Domain.dll": {}
+        }
+      },
+      "VanBora.Infrastructure/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v9.0",
+        "dependencies": {
+          "VanBora.Domain": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/VanBora.Infrastructure.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/VanBora.Infrastructure.dll": {}
+        }
       }
     }
   },
@@ -67,11 +103,28 @@
         "microsoft.openapi.1.6.17.nupkg.sha512",
         "microsoft.openapi.nuspec"
       ]
+    },
+    "VanBora.Application/1.0.0": {
+      "type": "project",
+      "path": "../VanBora.Application/VanBora.Application.csproj",
+      "msbuildProject": "../VanBora.Application/VanBora.Application.csproj"
+    },
+    "VanBora.Domain/1.0.0": {
+      "type": "project",
+      "path": "../VanBora.Domain/VanBora.Domain.csproj",
+      "msbuildProject": "../VanBora.Domain/VanBora.Domain.csproj"
+    },
+    "VanBora.Infrastructure/1.0.0": {
+      "type": "project",
+      "path": "../VanBora.Infrastructure/VanBora.Infrastructure.csproj",
+      "msbuildProject": "../VanBora.Infrastructure/VanBora.Infrastructure.csproj"
     }
   },
   "projectFileDependencyGroups": {
     "net9.0": [
-      "Microsoft.AspNetCore.OpenApi >= 9.0.12"
+      "Microsoft.AspNetCore.OpenApi >= 9.0.12",
+      "VanBora.Application >= 1.0.0",
+      "VanBora.Infrastructure >= 1.0.0"
     ]
   },
   "packageFolders": {
@@ -105,7 +158,14 @@
       "frameworks": {
         "net9.0": {
           "targetAlias": "net9.0",
-          "projectReferences": {}
+          "projectReferences": {
+            "C:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Application\\VanBora.Application.csproj": {
+              "projectPath": "C:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Application\\VanBora.Application.csproj"
+            },
+            "C:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Infrastructure\\VanBora.Infrastructure.csproj": {
+              "projectPath": "C:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Infrastructure\\VanBora.Infrastructure.csproj"
+            }
+          }
         }
       },
       "warningProperties": {
