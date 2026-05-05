@@ -23,9 +23,13 @@ O **VanBora** é uma plataforma **SaaS (Software as a Service)** que conecta pas
 
 | Ator | Descrição |
 |------|-----------|
-| **👤 Usuário (Passageiro)** | Pessoa que utiliza a plataforma para reservar assentos e opcionalmente adquirir ingressos. **Precisa criar uma conta** para fazer reservas |
-| **👨‍💼 Gerente da Van** | Responsável por criar viagens, gerenciar vans, definir preços, comprar ingressos do clube e definir quantos estão disponíveis. Cada gerente opera **independentemente** (multi-tenant) |
-| **🔧 Administrador VanBora** | Gerencia o sistema, tenants, taxas, e configurações globais |
+| **👤 Usuário** | Pessoa física identificada por **CPF único**. Uma mesma pessoa pode ter **múltiplos perfis** no sistema (Passageiro, Gerente, Motorista, Admin) |
+| **👤 Passageiro (Perfil)** | Perfil que permite reservar assentos em viagens. Um usuário pode ter este perfil |
+| **👨‍💼 Gerente (Perfil)** | Perfil de tenant — responsável por criar viagens, gerenciar vans, definir preços. Cada gerente opera **independentemente** (multi-tenant) |
+| **🔧 Motorista (Perfil)** | Perfil cadastrado por um Gerente, sem login próprio. Alocado nas viagens |
+| **🔧 Administrador (Perfil)** | Perfil de admin do sistema, criado diretamente no banco de dados |
+
+> **Modelo unificado:** Um **Usuario** (CPF único) pode ter múltiplos **Perfis**. Ex: João é Gerente de van para jogos do Flamengo E também pode ser Passageiro para ir a shows — ambos com o mesmo CPF.
 
 ---
 
@@ -112,7 +116,29 @@ Reserva criada → QR Code gerado → Usuário paga → Confirmação →
 
 ## 5. Fluxos Principais
 
-### 5.1. Fluxo do Gerente da Van (Tenant)
+### 5.1. Fluxo de Cadastro (Usuario + Perfil)
+
+```mermaid
+flowchart TD
+    A[Usuário acessa o sistema] --> B{Pessoa já tem cadastro?}
+    B -->|Não| C[Criar Usuario\nnome + CPF]
+    B -->|Sim| D{Que perfil deseja?}
+    C --> D
+    D -->|Passageiro| E[Criar Perfil Passageiro\nemail + senha + telefone]
+    D -->|Gerente| F[Criar Perfil Gerente\nemail + senha + slug + telefone]
+    D -->|Motorista| G[Gerente cadastra Motorista\nbusca Usuario por CPF ou cria\n+ cria Perfil Motorista\nsem senha - não faz login]
+    D -->|Admin| H[Criado diretamente no banco]
+    
+    E --> I[Usuario com Perfil Passageiro]
+    F --> J[Usuario com Perfil Gerente]
+    G --> K[Usuario com Perfil Motorista]
+    
+    I --> L[Mesmo CPF pode ter\nmúltiplos perfis]
+    J --> L
+    K --> L
+```
+
+### 5.2. Fluxo do Gerente da Van (Tenant)
 
 ```mermaid
 flowchart TD
@@ -128,7 +154,7 @@ flowchart TD
     I --> J
 ```
 
-### 5.2. Fluxo do Usuário (Passageiro)
+### 5.3. Fluxo do Usuário (Passageiro)
 
 ```mermaid
 flowchart TD
@@ -151,7 +177,7 @@ flowchart TD
     O -->|Não| Q[Enviar email de confirmação da reserva]
 ```
 
-### 5.3. Diagrama de Estados da Reserva
+### 5.4. Diagrama de Estados da Reserva
 
 ```mermaid
 stateDiagram-v2
@@ -173,7 +199,7 @@ stateDiagram-v2
 |---|-------|
 | RN01 | O sistema é **multi-tenant**: cada gerente de van opera independentemente |
 | RN02 | O **gerente da van** define os preços do assento e do ingresso, e cria suas próprias viagens |
-| RN03 | O VanBora ganha uma **taxa por reserva**; os 2 primeiros clientes são isentos |
+| RN03 | O VanBora ganha uma **taxa por reserva**. Os **2 primeiros gerentes** cadastrados na plataforma são **gratuitos** (taxa = 0). O Admin pode ajustar a taxa de cada gerente individualmente |
 | RN04 | O **usuário precisa ter uma conta** para fazer uma reserva |
 | RN05 | O usuário pode reservar **1 ou mais assentos** em uma única reserva |
 | RN06 | Cada assento pode ter ou não um **ingresso** associado |
@@ -185,6 +211,16 @@ stateDiagram-v2
 | RN12 | O sistema atende **qualquer tipo de evento** (jogos, shows, passeios turísticos) |
 | RN13 | O **gerente não cadastra ingressos individuais** no sistema. O usuário recebe um **link para Face ID** no site oficial do clube |
 | RN14 | Se a reserva for **somente assento**, o usuário recebe apenas a confirmação da reserva |
+| RN15 | A **capacidade da van** não pode ser alterada após a criação — é uma característica física fixa do veículo |
+| RN16 | O **CPF** é único e imutável. Cada pessoa física tem **um único Usuario** no sistema. Qualquer cadastro (Passageiro, Gerente, Motorista) **reutiliza o Usuario existente** pelo CPF — nunca retorna erro de CPF duplicado. O **Slug do gerente** também é imutável |
+| RN17 | A **exclusão de conta** é **soft delete** (desativação lógica). Requer **confirmação por código enviado por email**. O usuário pode desativar perfis específicos ou todos os perfis |
+| RN18 | O **gerente** pode cadastrar, listar, atualizar e remover **motoristas** vinculados ao seu perfil. A remoção de motorista é **soft delete** (Ativo = false) apenas se ele **não estiver alocado em nenhuma ViagemVan futura**; caso contrário, retorna erro 422 |
+| RN19 | O **passageiro tem 10 minutos** para efetuar o pagamento da reserva após criá-la. Após esse prazo, a reserva expira automaticamente e os assentos são liberados |
+| RN20 | O **gerente pode cancelar** suas próprias viagens a qualquer momento. Se a viagem tiver **reservas confirmadas**, todas devem ser **reembolsadas integralmente via Pix (automático)** e o status alterado para "Cancelada" |
+| RN21 | Ao **remover uma van de uma viagem**, se a van tiver **reservas confirmadas**, todas devem ser **reembolsadas integralmente via Pix (automático)** antes da desalocação |
+| RN22 | Um **Usuario** pode ter **múltiplos Perfis** (Passageiro, Gerente, Motorista, Admin) associados ao mesmo CPF |
+| RN23 | O **Motorista não possui login** — é cadastrado pelo Gerente e não tem email/senha para acesso ao sistema |
+| RN24 | Email é único **por Perfil**, não por Usuario. Um Gerente e um Passageiro (mesmo Usuario) podem ter emails diferentes |
 
 ---
 
@@ -197,7 +233,7 @@ stateDiagram-v2
 - **ORM:** **Entity Framework Core**
 - **Pagamento:** Integração com gateway Pix (QR Code)
 - **Email:** Serviço de envio de emails transacionais
-- **Autenticação:** JWT com Identity (separando tenants de usuários finais)
+- **Autenticação:** JWT com claims de perfis
 
 ---
 
@@ -208,7 +244,9 @@ stateDiagram-v2
 | **SaaS** | Software as a Service — modelo de assinatura/software sob demanda |
 | **Tenant** | Inquilino — cada gerente/empresa de van no sistema |
 | **Multi-tenant** | Múltiplos inquilinos isolados na mesma plataforma |
-| **Passageiro** | Usuário final que reserva assentos |
+| **Usuario** | Entidade base — pessoa física identificada por CPF único |
+| **Perfil** | Papel que um Usuario pode ter (Passageiro, Gerente, Motorista, Admin) |
+| **Passageiro** | Perfil de usuário final que reserva assentos |
 | **0800** | Gratuito, sem custo |
 | **Face ID** | Autenticação biométrica para acesso ao estádio/evento |
 | **QR Code** | Código para pagamento via Pix |
@@ -218,7 +256,8 @@ stateDiagram-v2
 ## 9. Próximos Passos
 
 1. ✅ Documento base criado e revisado
-2. ⬜ Detalhar entidades de domínio (Domain layer)
-3. ⬜ Mapear relacionamentos entre entidades
-4. ⬜ Definir endpoints da API
-5. ⬜ Criar plano de implementação com tasks detalhadas
+2. ✅ Modelo Usuario + Perfil definido
+3. ⬜ Detalhar entidades de domínio (Domain layer)
+4. ⬜ Mapear relacionamentos entre entidades
+5. ⬜ Definir endpoints da API
+6. ⬜ Criar plano de implementação com tasks detalhadas

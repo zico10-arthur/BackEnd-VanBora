@@ -4,26 +4,42 @@
 
 ---
 
-## US01 — Cadastro de Gerente
+## US01 — Cadastro de Gerente (Usuario + Perfil Gerente)
 
 **Como** um gerente de van
-**Quero** me cadastrar na plataforma VanBora
+**Quero** me cadastrar na plataforma VanBora (criar Usuario + Perfil Gerente)
 **Para** gerenciar minhas vans e criar viagens
+
+> **Modelo:** O cadastro cria um **Usuario** (pessoa física, CPF único) e um **Perfil Gerente** vinculado. Se o CPF já existir (ex: a pessoa já é Passageiro), o sistema apenas adiciona o Perfil Gerente ao Usuario existente.
 
 ### Cenários de Aceitação
 
 ```gherkin
-Cenário: Cadastro bem-sucedido
-  Dado que sou um gerente de van
-  Quando envio meus dados (nome, email, telefone, senha)
-  Então minha conta é criada com status ativo
-  E recebo um token JWT para acesso
+Cenário: Cadastro bem-sucedido (novo Usuario)
+  Dado que não existe um Usuario com o CPF informado
+  Quando envio meus dados (nome, cpf, email, telefone, senha, slug)
+  Então um novo Usuario é criado
+  E um Perfil Gerente é vinculado a ele
+  E recebo um token JWT com perfil_atual = Gerente
 
-Cenário: Email duplicado
-  Dado que já existe um gerente com email "gerente@email.com"
-  Quando tento cadastrar com o mesmo email
+Cenário: Cadastro com CPF existente (adicionar perfil)
+  Dado que já existe um Usuario com CPF "12345678909"
+  Quando envio dados de cadastro de gerente com o mesmo CPF
+  Então um novo Perfil Gerente é adicionado ao Usuario existente
+  E recebo um token JWT com perfil_atual = Gerente
+  E o JWT lista perfis = [Passageiro, Gerente]
+
+Cenário: Email duplicado entre Perfis Gerente
+  Dado que já existe um Perfil Gerente com email "contato@transpabc.com"
+  Quando tento cadastrar outro gerente com o mesmo email
   Então recebo um erro 409 Conflict
-  E a mensagem "Email já cadastrado"
+  E a mensagem "Email já cadastrado para outro gerente"
+
+Cenário: Slug duplicado
+  Dado que já existe um gerente com slug "transp-abc"
+  Quando tento cadastrar com o mesmo slug
+  Então recebo um erro 409 Conflict
+  E a mensagem "Slug já cadastrado"
 
 Cenário: Dados inválidos
   Dado que envio um email sem formato válido
@@ -38,6 +54,7 @@ Cenário: Dados inválidos
 ```json
 {
   "nome": "Transportadora ABC",
+  "cpf": "12345678909",
   "slug": "transp-abc",
   "email": "contato@transpabc.com",
   "telefone": "11999999999",
@@ -48,7 +65,8 @@ Cenário: Dados inválidos
 **Resposta (201):**
 ```json
 {
-  "id": "a1b2c3d4-...",
+  "usuarioId": "u1u2u3u4-...",
+  "perfilId": "p1p2p3p4-...",
   "nome": "Transportadora ABC",
   "slug": "transp-abc",
   "email": "contato@transpabc.com",
@@ -57,6 +75,7 @@ Cenário: Dados inválidos
   "taxaPlataforma": 5.0,
   "gratuito": false,
   "criadoEm": "2026-05-04T12:00:00Z",
+  "perfis": ["Gerente"],
   "token": "eyJhbGciOi..."
 }
 ```
@@ -111,20 +130,31 @@ Cenário: Conta inativa
 
 ---
 
-## US03 — Cadastro de Usuário (Passageiro)
+## US03 — Cadastro de Usuário Passageiro (Usuario + Perfil Passageiro)
 
 **Como** um passageiro
 **Quero** me cadastrar na plataforma VanBora
 **Para** fazer reservas em viagens
 
+> **Modelo:** O cadastro cria um **Usuario** (pessoa física, CPF único) e um **Perfil Passageiro**. Se o CPF já existir (ex: a pessoa já é Gerente), o sistema reutiliza o Usuario e adiciona o Perfil Passageiro.
+
 ### Cenários de Aceitação
 
 ```gherkin
-Cenário: Cadastro bem-sucedido
-  Dado que sou um passageiro
+Cenário: Cadastro bem-sucedido (novo Usuario)
+  Dado que não existe Usuario com este CPF
   Quando envio meus dados (nome, email, cpf, telefone, senha)
-  Então minha conta é criada
-  E recebo um token JWT
+  Então um novo Usuario é criado
+  E um Perfil Passageiro é vinculado
+  E recebo um token JWT com perfil_atual = Passageiro
+
+Cenário: CPF já existente (adicionar perfil)
+  Dado que já existe um Usuario com CPF "12345678909" (ex: como Gerente)
+  Quando envio dados de cadastro de passageiro com o mesmo CPF
+  Então o Usuario existente é reutilizado
+  E um novo Perfil Passageiro é vinculado a ele
+  E recebo um token JWT com perfil_atual = Passageiro
+  E o JWT lista perfis = [Gerente, Passageiro]
 
 Cenário: CPF inválido
   Dado que envio um CPF com dígitos inválidos
@@ -132,10 +162,11 @@ Cenário: CPF inválido
   Então recebo um erro 400
   E a mensagem "CPF inválido"
 
-Cenário: Email já cadastrado
-  Dado que já existe um usuário com aquele email
-  Quando tento cadastrar novamente
+Cenário: Email já cadastrado em outro Perfil
+  Dado que já existe um Perfil com email "joao@email.com"
+  Quando tento cadastrar com o mesmo email
   Então recebo um erro 409 Conflict
+  E a mensagem "Email já cadastrado"
 ```
 
 ### Exemplo
@@ -154,6 +185,26 @@ Cenário: Email já cadastrado
 ---
 
 ## US04 — Login de Usuário
+
+**Como** um passageiro cadastrado
+**Quero** fazer login na plataforma
+**Para** acessar minhas reservas e criar novas
+
+### Cenários de Aceitação
+
+```gherkin
+Cenário: Login bem-sucedido
+  Dado que estou cadastrado com email "joao@email.com"
+  Quando informo meu email e senha corretos
+  Então recebo um token JWT válido
+
+Cenário: Senha incorreta
+  Dado que estou cadastrado
+  Quando informo a senha errada
+  Então recebo um erro 401 Unauthorized
+```
+
+### Exemplo
 
 **Requisição:** `POST /api/auth/login`
 ```json
@@ -480,6 +531,12 @@ Cenário: Reserva para terceiros
   Quando crio uma reserva com 3 passageiros (eu + 2 amigos)
   Então cada itemReserva tem seus próprios dados de passageiro
   E a reserva fica vinculada a mim como responsável
+
+Cenário: Reserva expira em 10 minutos
+  Dado que crio uma reserva com sucesso
+  Quando não realizo o pagamento em até 10 minutos
+  Então a reserva expira automaticamente
+  E os assentos são liberados para outros usuários
 ```
 
 ### Exemplo
@@ -811,11 +868,17 @@ Cenário: Remover van sem reservas
   Quando removo a van
   Então a van é desalocada da viagem
 
-Cenário: Remover van com reservas
-  Dado que a van tem reservas confirmadas
-  Quando tento remover a van
-  Então recebo um erro 400
-  E a mensagem "Não é possível remover van com reservas ativas"
+Cenário: Remover van com reservas confirmadas
+  Dado que a van tem 2 reservas confirmadas
+  Quando removo a van
+  Então as 2 reservas são reembolsadas integralmente
+  E a van é desalocada da viagem
+
+Cenário: Remover van com reservas pendentes
+  Dado que a van tem 1 reserva pendente de pagamento
+  Quando removo a van
+  Então a reserva pendente é cancelada sem reembolso
+  E a van é desalocada da viagem
 ```
 
 ### Exemplo
@@ -825,37 +888,835 @@ Cenário: Remover van com reservas
 **Resposta (200):**
 ```json
 {
-  "mensagem": "Van removida da viagem com sucesso"
+  "mensagem": "Van removida da viagem com sucesso",
+  "reservasReembolsadas": 2,
+  "reservasCanceladas": 1,
+  "totalReembolsado": 179.80
 }
 ```
 
 ---
 
-## US16 — Fluxo 0800 (Primeiros Clientes)
+## US16 — Fluxo 0800 (Primeiros Gerentes)
 
 **Como** um novo gerente na plataforma
-**Quero** que os 2 primeiros clientes que fizerem reserva não paguem taxa
-**Para** incentivar os primeiros passageiros a experimentar o serviço
+**Quero** saber se sou um dos primeiros gerentes a se cadastrar
+**Para** não pagar taxa caso esteja entre os 2 primeiros
+
+> **Regra:** Os **2 primeiros gerentes** a se cadastrarem na plataforma recebem `gratuito = true` automaticamente (taxa = 0 em todas as reservas). O 3º gerente em diante começa com `gratuito = false` e `taxaPlataforma` definida pelo Admin. O Admin pode ajustar `taxaPlataforma` e `gratuito` individualmente para qualquer gerente.
 
 ### Cenários de Aceitação
 
-```ghermin
-Cenário: Primeira reserva do gerente é 0800
-  Dado que o gerente tem gratuito = true
-  Quando o primeiro cliente faz uma reserva
-  Então a taxaPlataforma na reserva é calculada como 0
-  E o gerente ainda permanece com gratuito = true
+```gherkin
+Cenário: Primeiro gerente do sistema é 0800
+  Dado que não existem gerentes cadastrados
+  Quando o primeiro gerente se cadastra
+  Então ele recebe gratuito = true automaticamente
+  E taxaPlataforma = 0
+  E todas as suas reservas terão taxa = 0
 
-Cenário: Segunda reserva do gerente é 0800
-  Dado que o gerente tem gratuito = true e já tem 1 reserva
-  Quando o segundo cliente faz uma reserva
-  Então a taxaPlataforma na reserva é calculada como 0
-  E após a confirmação, gratuito muda para false
+Cenário: Segundo gerente do sistema é 0800
+  Dado que existe 1 gerente cadastrado
+  Quando o segundo gerente se cadastra
+  Então ele recebe gratuito = true automaticamente
+  E taxaPlataforma = 0
 
-Cenário: Terceira reserva paga taxa normal
-  Dado que o gerente tem gratuito = false
-  Quando um cliente faz uma reserva
-  Então a taxaPlataforma é calculada normalmente (ex: 5% do valorTotal)
+Cenário: Terceiro gerente paga taxa
+  Dado que já existem 2 gerentes com gratuito = true
+  Quando o terceiro gerente se cadastra
+  Então ele recebe gratuito = false
+  E taxaPlataforma = 5.0 (ou valor definido pelo Admin)
+
+Cenário: Admin ajusta taxa de um gerente
+  Dado que existe um gerente com taxaPlataforma = 5.0
+  Quando o Admin altera a taxa para 3.0
+  Então as novas reservas usarão taxa = 3.0
+  E as reservas existentes mantêm a taxa anterior
+```
+
+---
+
+## US17 — Atualizar Van
+
+**Como** um gerente logado
+**Quero** atualizar os dados de uma van
+**Para** corrigir informações como nome, modelo ou placa
+
+### Cenários de Aceitação
+
+```gherkin
+Cenário: Atualizar nome e modelo com sucesso
+  Dado que tenho uma van cadastrada
+  Quando atualizo o nome e o modelo
+  Então os dados são alterados com sucesso
+
+Cenário: Tentar alterar capacidade
+  Dado que tenho uma van cadastrada com capacidade 16
+  Quando tento alterar a capacidade para 20
+  Então recebo um erro 400
+  E a mensagem "Capacidade não pode ser alterada após a criação"
+
+Cenário: Van não encontrada
+  Dado que o id da van não existe
+  Quando tento atualizar
+  Então recebo um erro 404 Not Found
+```
+
+### Exemplo
+
+**Requisição:** `PUT /api/gerente/vans/{id}`
+```json
+{
+  "nome": "Van 1 - Mercedes Modificada",
+  "placa": "ABC1D23",
+  "modelo": "Mercedes-Benz Sprinter 2025"
+}
+```
+
+**Resposta (200):**
+```json
+{
+  "id": "c3d4e5f6-...",
+  "nome": "Van 1 - Mercedes Modificada",
+  "placa": "ABC1D23",
+  "modelo": "Mercedes-Benz Sprinter 2025",
+  "capacidade": 16,
+  "ativo": true
+}
+```
+
+---
+
+## US18 — Atualizar Perfil do Passageiro
+
+**Como** um passageiro logado
+**Quero** atualizar meus dados pessoais
+**Para** manter meu cadastro sempre atualizado
+
+> **Modelo:** O nome fica no **Usuario** (compartilhado entre perfis). Email, telefone e senha ficam no **Perfil Passageiro**.
+
+### Cenários de Aceitação
+
+```gherkin
+Cenário: Atualizar nome do Usuario
+  Dado que estou logado com perfil Passageiro
+  Quando atualizo meu nome
+  Então o nome é alterado em todas as visualizações (compartilhado entre perfis)
+
+Cenário: Atualizar email e telefone do Perfil
+  Dado que estou logado com perfil Passageiro
+  Quando atualizo meu email e telefone
+  Então os dados do Perfil Passageiro são alterados
+
+Cenário: Tentar alterar CPF
+  Dado que estou logado
+  Quando tento alterar meu CPF
+  Então recebo um erro 400
+  E a mensagem "CPF não pode ser alterado"
+
+Cenário: Alterar senha
+  Dado que estou logado com perfil Passageiro
+  Quando altero minha senha informando a senha atual correta
+  Então a senha do Perfil Passageiro é atualizada
+
+Cenário: Alterar senha com senha atual errada
+  Dado que estou logado
+  Quando tento alterar minha senha com a senha atual incorreta
+  Então recebo um erro 401
+  E a mensagem "Senha atual incorreta"
+```
+
+### Exemplo
+
+**Requisição:** `PUT /api/auth/perfil/passageiro`
+```json
+{
+  "nome": "João Silva Atualizado",
+  "email": "joao.novo@email.com",
+  "telefone": "11977777777",
+  "senhaAtual": "SenhaDoJoao123",
+  "novaSenha": "NovaSenha456"
+}
+```
+
+**Resposta (200):**
+```json
+{
+  "usuarioId": "u1u2u3u4-...",
+  "perfilId": "p1p2p3p4-...",
+  "nome": "João Silva Atualizado",
+  "email": "joao.novo@email.com",
+  "telefone": "11977777777",
+  "cpf": "12345678909",
+  "tipo": "Passageiro"
+}
+```
+
+---
+
+## US19 — Atualizar Perfil do Gerente
+
+**Como** um gerente logado
+**Quero** atualizar meus dados da empresa
+**Para** manter meu cadastro sempre atualizado
+
+> **Modelo:** O nome fica no **Usuario** (compartilhado entre perfis). Email, telefone, senha e slug ficam no **Perfil Gerente**.
+
+### Cenários de Aceitação
+
+```gherkin
+Cenário: Atualizar nome do Usuario
+  Dado que estou logado com perfil Gerente
+  Quando atualizo meu nome
+  Então o nome é alterado em todos os perfis do Usuario
+
+Cenário: Atualizar email e telefone do Perfil Gerente
+  Dado que estou logado com perfil Gerente
+  Quando atualizo meu email e telefone
+  Então os dados do Perfil Gerente são alterados
+
+Cenário: Tentar alterar slug
+  Dado que estou logado como gerente
+  Quando tento alterar meu slug
+  Então recebo um erro 400
+  E a mensagem "Slug não pode ser alterado"
+```
+
+### Exemplo
+
+**Requisição:** `PUT /api/auth/perfil/gerente`
+```json
+{
+  "nome": "Transportadora ABC Atualizada",
+  "email": "contato.novo@transpabc.com",
+  "telefone": "11988888888",
+  "senhaAtual": "MinhaSenha123",
+  "novaSenha": "NovaSenha456"
+}
+```
+
+**Resposta (200):**
+```json
+{
+  "usuarioId": "u1u2u3u4-...",
+  "perfilId": "p1p2p3p4-...",
+  "nome": "Transportadora ABC Atualizada",
+  "slug": "transp-abc",
+  "email": "contato.novo@transpabc.com",
+  "telefone": "11988888888",
+  "ativo": true,
+  "tipo": "Gerente"
+}
+```
+
+---
+
+## US20 — Desativar Conta (Soft Delete)
+
+**Como** um usuário ou gerente logado
+**Quero** desativar minha conta
+**Para** remover meu acesso à plataforma, podendo reativar depois se quiser
+
+> **Modelo:** Todas as exclusões são **soft delete** (lógicas). O registro permanece no banco com `Ativo = false`. O usuário pode desativar um perfil específico ou todos os seus perfis. A reativação pode ser feita pelo Admin.
+
+### Cenários de Aceitação
+
+```gherkin
+Cenário: Solicitar desativação com sucesso
+  Dado que estou logado
+  Quando solicito a desativação da minha conta
+  Então recebo um código de confirmação no meu email
+
+Cenário: Confirmar desativação com código válido
+  Dado que solicitei a desativação e recebi o código
+  Quando informo o código correto
+  Então meus perfis são marcados como Ativo = false
+  E recebo uma confirmação por email
+  E não consigo mais fazer login
+
+Cenário: Desativar perfil específico
+  Dado que tenho múltiplos perfis (Passageiro e Gerente)
+  Quando solicito desativar apenas o Perfil Gerente
+  Então apenas o Perfil Gerente fica com Ativo = false
+  E ainda posso logar como Passageiro
+
+Cenário: Código inválido
+  Dado que solicitei a desativação
+  Quando informo um código incorreto
+  Então recebo um erro 400
+  E a mensagem "Código de confirmação inválido"
+
+Cenário: Gerente com reservas ativas
+  Dado que sou um gerente com viagens com reservas confirmadas
+  Quando tento desativar minha conta
+  Então recebo um erro 400
+  E a mensagem "Não é possível desativar conta com reservas ativas"
+```
+
+### Exemplo
+
+**Requisição:** `POST /api/auth/solicitar-exclusao`
+```json
+{
+  "email": "joao@email.com"
+}
+```
+
+**Resposta (200):**
+```json
+{
+  "mensagem": "Código de confirmação enviado para joao@email.com",
+  "expiraEm": "2026-05-05T19:15:00Z"
+}
+```
+
+**Requisição:** `POST /api/auth/confirmar-exclusao`
+```json
+{
+  "email": "joao@email.com",
+  "codigo": "ABC123"
+}
+```
+
+**Resposta (200):**
+```json
+{
+  "mensagem": "Conta excluída com sucesso"
+}
+```
+
+---
+
+## US21 — Alterar Senha
+
+**Como** qualquer usuário logado (passageiro ou gerente)
+**Quero** alterar minha senha
+**Para** manter minha conta segura
+
+### Cenários de Aceitação
+
+```gherkin
+Cenário: Alterar senha com sucesso
+  Dado que estou logado
+  Quando informo minha senha atual e uma nova senha
+  Então a senha é alterada com sucesso
+
+Cenário: Senha atual incorreta
+  Dado que estou logado
+  Quando informo a senha atual errada
+  Então recebo um erro 401
+  E a mensagem "Senha atual incorreta"
+
+Cenário: Nova senha fraca
+  Dado que estou logado
+  Quando informo uma nova senha muito curta
+  Então recebo um erro 400
+  E a mensagem "Senha deve ter no mínimo 6 caracteres"
+```
+
+### Exemplo
+
+**Requisição:** `POST /api/auth/alterar-senha`
+```json
+{
+  "senhaAtual": "MinhaSenhaAntiga123",
+  "novaSenha": "MinhaNovaSenha456"
+}
+```
+
+**Resposta (200):**
+```json
+{
+  "mensagem": "Senha alterada com sucesso"
+}
+```
+
+---
+
+## US22 — Admin: Buscar Usuarios e Perfis
+
+**Como** um administrador VanBora
+**Quero** pesquisar usuarios por nome ou CPF e ver seus perfis
+**Para** encontrar rapidamente uma pessoa no sistema
+
+> **Modelo:** A busca é feita na entidade **Usuario** (unificada). A resposta mostra todos os Perfis que aquele Usuario possui.
+
+### Cenários de Aceitação
+
+```gherkin
+Cenário: Buscar usuario por nome
+  Dado que existem usuarios cadastrados
+  Quando pesquiso por "João"
+  Então vejo todos os usuarios com "João" no nome
+  E cada resultado mostra a lista de perfis do usuario
+
+Cenário: Buscar usuario por CPF
+  Dado que existe um usuario com CPF "12345678909"
+  Quando pesquiso por "12345678909"
+  Então vejo apenas aquele usuario
+  E seus perfis
+
+Cenário: Buscar gerentes especificamente
+  Dado que existem usuarios com perfil Gerente
+  Quando pesquiso por "Transportadora" em /api/admin/gerentes
+  Então vejo apenas usuarios que têm Perfil Gerente
+  E que correspondem ao nome "Transportadora"
+
+Cenário: Ver perfis de um usuario
+  Dado que existe um usuario com perfis Passageiro e Gerente
+  Quando acessos os detalhes
+  Então vejo a lista completa de perfis com email, status e tipo
+
+Cenário: Nenhum resultado
+  Dado que não existem usuarios com aquele nome
+  Quando pesquiso
+  Então recebo uma lista vazia
+```
+
+### Exemplo
+
+**Requisição:** `GET /api/admin/usuarios?search=João`
+
+**Resposta (200):**
+```json
+[
+  {
+    "usuarioId": "u1u2u3u4-...",
+    "nome": "João Silva",
+    "cpf": "12345678909",
+    "perfis": [
+      {
+        "perfilId": "p1p2p3p4-...",
+        "tipo": "Passageiro",
+        "email": "joao@email.com",
+        "ativo": true
+      },
+      {
+        "perfilId": "p5p6p7p8-...",
+        "tipo": "Gerente",
+        "email": "contato@transpabc.com",
+        "slug": "transp-abc",
+        "ativo": true
+      }
+    ],
+    "totalReservas": 3,
+    "criadoEm": "2026-05-01T10:00:00Z"
+  }
+]
+```
+
+**Requisição:** `GET /api/admin/gerentes?search=Transportadora`
+
+**Resposta (200):**
+```json
+[
+  {
+    "usuarioId": "u1u2u3u4-...",
+    "nome": "João Silva",
+    "cpf": "12345678909",
+    "perfis": [
+      {
+        "perfilId": "p5p6p7p8-...",
+        "tipo": "Gerente",
+        "email": "contato@transpabc.com",
+        "slug": "transp-abc",
+        "ativo": true,
+        "taxaPlataforma": 5.0,
+        "totalViagens": 5
+      }
+    ],
+    "criadoEm": "2026-04-01T10:00:00Z"
+  }
+]
+```
+
+---
+
+## US23 — Admin: Ver Histórico de Reservas de Passageiro ou Gerente
+
+**Como** um administrador VanBora
+**Quero** visualizar o histórico completo de reservas de qualquer passageiro ou gerente
+**Para** auditar o uso da plataforma e oferecer suporte
+
+### Cenários de Aceitação
+
+```gherkin
+Cenário: Ver histórico de reservas de um passageiro
+  Dado que existe um passageiro com reservas passadas e futuras
+  Quando o admin acessa o histórico desse passageiro
+  Então visualiza todas as reservas ordenadas da mais recente para a mais antiga
+  E cada reserva mostra o status, data, valor e detalhes da viagem
+
+Cenário: Ver histórico de viagens de um gerente
+  Dado que um gerente possui viagens realizadas
+  Quando o admin acessa o histórico desse gerente
+  Então visualiza todas as viagens com data, vans envolvidas e total arrecadado
+
+Cenário: Admin busca passageiro e vê o histórico
+  Dado que o admin pesquisou por um passageiro
+  Quando clica no perfil do passageiro
+  Então o histórico de reservas aparece junto com os dados do usuário
+
+Cenário: Histórico vazio
+  Dado que um usuário nunca fez nenhuma reserva
+  Quando o admin acessa o histórico
+  Então recebe uma lista vazia
+```
+
+### Exemplo
+
+**Requisição:** `GET /api/admin/usuarios/{id}/reservas`
+
+**Resposta (200):**
+```json
+[
+  {
+    "id": "r1s2t3u4-...",
+    "status": "Confirmada",
+    "valorTotal": 120.00,
+    "taxaPlataforma": 6.00,
+    "criadaEm": "2026-05-10T14:30:00Z",
+    "viagem": {
+      "id": "v1w2x3y4-...",
+      "origem": "São Paulo, SP",
+      "destino": "Rio de Janeiro, RJ",
+      "dataPartida": "2026-05-20T08:00:00Z"
+    },
+    "itens": [
+      {
+        "assento": 1,
+        "passageiroNome": "João Silva",
+        "passageiroDocumento": "12345678909",
+        "valor": 60.00
+      },
+      {
+        "assento": 2,
+        "passageiroNome": "Maria Souza",
+        "passageiroDocumento": "98765432100",
+        "valor": 60.00
+      }
+    ]
+  }
+]
+```
+
+**Requisição:** `GET /api/admin/gerentes/{id}/reservas`
+
+**Resposta (200):**
+```json
+[
+  {
+    "viagemId": "v1w2x3y4-...",
+    "origem": "São Paulo, SP",
+    "destino": "Rio de Janeiro, RJ",
+    "dataPartida": "2026-05-20T08:00:00Z",
+    "totalReservas": 15,
+    "totalArrecadado": 900.00,
+    "taxaPlataforma": 45.00,
+    "statusViagem": "Realizada"
+  }
+]
+```
+
+---
+
+## US24 — Gerente: Cadastrar Motorista (Perfil Motorista)
+
+**Como** um gerente de van
+**Quero** cadastrar motoristas no sistema
+**Para** alocá-los nas viagens e controlar minha frota
+
+> **Modelo:** O Motorista é um **Perfil** (Tipo=Motorista) vinculado a um **Usuario**. O sistema busca um Usuario existente pelo CPF informado. Se existir, cria Perfil Motorista para ele. Se não existir, cria um novo Usuario + Perfil Motorista. Motorista **não tem email nem senha** — não faz login.
+
+### Cenários de Aceitação
+
+```gherkin
+Cenário: Cadastrar motorista com CPF existente
+  Dado que estou logado como gerente
+  E que existe um Usuario com CPF "98765432100"
+  Quando informo nome, CPF, telefone e CNH do motorista
+  Então um Perfil Motorista é criado vinculado ao Usuario existente
+  E recebo os dados do motorista criado
+
+Cenário: Cadastrar motorista com CPF novo
+  Dado que estou logado como gerente
+  E que NÃO existe um Usuario com o CPF informado
+  Quando informo nome, CPF, telefone e CNH
+  Então um novo Usuario é criado
+  E um Perfil Motorista é vinculado a ele
+
+Cenário: Motorista já cadastrado no mesmo gerente
+  Dado que já existe um Perfil Motorista com CPF "98765432100" vinculado ao meu gerente
+  Quando tento cadastrar outro motorista com o mesmo CPF
+  Então recebo um erro 409
+  E a mensagem "Motorista já cadastrado"
+
+Cenário: CPF inválido
+  Dado que estou logado como gerente
+  Quando informo um CPF com dígitos inválidos
+  Então recebo um erro 400
+  E a mensagem "CPF inválido"
+
+Cenário: Campos obrigatórios ausentes
+  Dado que estou logado como gerente
+  Quando não informo o nome do motorista
+  Então recebo um erro 400
+  E a mensagem "Nome é obrigatório"
+
+Cenário: Listar motoristas cadastrados
+  Dado que estou logado como gerente
+  E que cadastrei 3 motoristas
+  Quando solicito a lista de motoristas
+  Então vejo os 3 motoristas cadastrados
+  E cada motorista mostra nome, CPF, telefone e status
+
+Cenário: Remover motorista sem viagens futuras
+  Dado que estou logado como gerente
+  E que o motorista não está alocado em nenhuma viagem futura
+  Quando removo o motorista
+  Então o Perfil Motorista é removido (exclusão lógica ou física)
+  E o Usuario permanece no sistema (pode ter outros perfis)
+
+Cenário: Remover motorista alocado em viagem futura
+  Dado que estou logado como gerente
+  E que o motorista está alocado em uma viagem futura
+  Quando tento remover o motorista
+  Então recebo um erro 422
+  E a mensagem "Motorista possui viagens futuras. Remova a alocação primeiro"
+```
+
+### Exemplo
+
+**Requisição:** `POST /api/gerente/motoristas`
+```json
+{
+  "nome": "Carlos Santos",
+  "cpf": "98765432100",
+  "telefone": "11977777777",
+  "cnh": "12345678901"
+}
+```
+
+**Resposta (201):**
+```json
+{
+  "usuarioId": "u1u2u3u4-...",
+  "perfilId": "p1p2p3p4-...",
+  "nome": "Carlos Santos",
+  "cpf": "98765432100",
+  "telefone": "11977777777",
+  "cnh": "12345678901",
+  "ativo": true,
+  "criadoEm": "2026-05-05T10:00:00Z"
+}
+```
+
+**Requisição:** `GET /api/gerente/motoristas`
+
+**Resposta (200):**
+```json
+[
+  {
+    "usuarioId": "u1u2u3u4-...",
+    "perfilId": "p1p2p3p4-...",
+    "nome": "Carlos Santos",
+    "cpf": "98765432100",
+    "telefone": "11977777777",
+    "cnh": "12345678901",
+    "ativo": true,
+    "criadoEm": "2026-05-05T10:00:00Z"
+  }
+]
+```
+
+---
+
+## US25 — Gerente: Alocar Motorista na Viagem
+
+**Como** um gerente de van
+**Quero** alocar um motorista a uma van específica em uma viagem
+**Para** definir quem vai dirigir cada van
+
+### Cenários de Aceitação
+
+```gherkin
+Cenário: Alocar motorista na van da viagem
+  Dado que existe uma viagem com uma van alocada
+  E que existe um motorista ativo cadastrado
+  Quando aloco o motorista naquela van da viagem
+  Então o motorista é vinculado com sucesso
+  E a van da viagem agora possui um motorista
+
+Cenário: Re-alocar motorista
+  Dado que a van da viagem já possui um motorista alocado
+  Quando aloco um motorista diferente
+  Então o motorista é substituído com sucesso
+
+Cenário: Motorista inativo
+  Dado que o motorista está marcado como inativo
+  Quando tento alocá-lo em uma van
+  Então recebo um erro 400
+  E a mensagem "Motorista inativo"
+
+Cenário: Motorista de outro gerente
+  Dado que o motorista pertence a outro gerente
+  Quando tento alocá-lo em minha van
+  Então recebo um erro 404
+```
+
+### Exemplo
+
+**Requisição:** `POST /api/gerente/viagens/{viagemId}/alocar-motorista/{viagemVanId}`
+```json
+{
+  "motoristaId": "m1n2o3p4-..."
+}
+```
+
+**Resposta (200):**
+```json
+{
+  "mensagem": "Motorista alocado com sucesso",
+  "viagemVanId": "v1w2x3y4-...",
+  "motorista": {
+    "id": "m1n2o3p4-...",
+    "nome": "Carlos Santos"
+  }
+}
+```
+
+---
+
+## US26 — Gerente: Listar e Cancelar Viagens
+
+**Como** um gerente logado
+**Quero** listar minhas viagens e cancelar viagens quando necessário
+**Para** gerenciar minha oferta e reembolsar passageiros em caso de cancelamento
+
+### Cenários de Aceitação
+
+```gherkin
+Cenário: Listar viagens do gerente
+  Dado que estou logado como gerente
+  E que criei 3 viagens (2 futuras e 1 concluída)
+  Quando solicito a lista de viagens
+  Então vejo todas as minhas viagens
+  E cada viagem mostra nome do evento, data, status e total de reservas
+
+Cenário: Cancelar viagem sem reservas
+  Dado que estou logado como gerente
+  E que a viagem não possui nenhuma reserva
+  Quando cancelo a viagem
+  Então a viagem é cancelada com status "Cancelada"
+  E não há reembolso a processar
+
+Cenário: Cancelar viagem com reservas confirmadas
+  Dado que estou logado como gerente
+  E que a viagem possui 5 reservas confirmadas
+  Quando cancelo a viagem
+  Então todas as 5 reservas são reembolsadas integralmente
+  E o status de cada reserva muda para "Cancelada"
+  E a viagem é marcada como "Cancelada"
+
+Cenário: Cancelar viagem com reservas pendentes
+  Dado que estou logado como gerente
+  E que a viagem possui 2 reservas pendentes de pagamento
+  Quando cancelo a viagem
+  Então as reservas pendentes são canceladas sem reembolso
+  E a viagem é marcada como "Cancelada"
+
+Cenário: Cancelar viagem já concluída
+  Dado que a viagem já foi realizada
+  Quando tento cancelá-la
+  Então recebo um erro 400
+  E a mensagem "Viagem já foi concluída"
+```
+
+### Exemplo
+
+**Requisição:** `GET /api/gerente/viagens`
+
+**Resposta (200):**
+```json
+[
+  {
+    "id": "d4e5f6a7-...",
+    "nomeEvento": "Flamengo x Palmeiras - Brasileirão",
+    "dataEvento": "2026-06-15T21:30:00Z",
+    "localEvento": "Maracanã - Rio de Janeiro",
+    "status": "Agendada",
+    "totalReservas": 5,
+    "totalReservasConfirmadas": 3,
+    "criadoEm": "2026-05-04T12:00:00Z"
+  }
+]
+```
+
+**Requisição:** `DELETE /api/gerente/viagens/{id}`
+
+**Resposta (200):**
+```json
+{
+  "mensagem": "Viagem cancelada com sucesso",
+  "reservasReembolsadas": 3,
+  "reservasCanceladas": 2,
+  "totalReembolsado": 269.70
+}
+```
+
+---
+
+## US27 — Alternar Perfil Ativo
+
+**Como** um usuario com múltiplos perfis
+**Quero** alternar entre meus perfis sem precisar fazer login novamente
+**Para** acessar funcionalidades de diferentes perfis (ex: de Passageiro para Gerente)
+
+### Cenários de Aceitação
+
+```gherkin
+Cenário: Alternar para perfil Gerente
+  Dado que estou logado com perfil Passageiro
+  E que também tenho um Perfil Gerente
+  Quando solicito alternar para meu Perfil Gerente
+  Então recebo um novo JWT com perfil_atual = Gerente
+  E as claims do token refletem o novo perfil
+
+Cenário: Alternar para perfil inexistente
+  Dado que estou logado como Passageiro
+  Quando tento alternar para um perfilId que não me pertence
+  Então recebo um erro 403 Forbidden
+  E a mensagem "Perfil não encontrado ou não pertence ao usuario"
+
+Cenário: Token atualizado com novo perfil
+  Dado que estou logado
+  Quando alterno de perfil
+  Então o novo token mantém sub (usuarioId) e nome
+  E altera perfil_atual e perfil_id
+  E as rotas disponíveis mudam conforme o novo perfil
+```
+
+### Exemplo
+
+**Requisição:** `POST /api/auth/alternar-perfil`
+```json
+{
+  "perfilId": "p5p6p7p8-..."
+}
+```
+
+**Resposta (200):**
+```json
+{
+  "token": "eyJhbGciOi...",
+  "perfilAtual": "Gerente",
+  "perfilId": "p5p6p7p8-...",
+  "perfisDisponiveis": ["Passageiro", "Gerente"],
+  "usuario": {
+    "id": "u1u2u3u4-...",
+    "nome": "João Silva"
+  }
+}
 ```
 
 ---
