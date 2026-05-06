@@ -49,7 +49,7 @@ erDiagram
     Van ||--|{ ViagemVan : "alocada_em"
     Perfil ||--o{ ViagemVan : "dirige_tipo_motorista"
     ViagemVan ||--o{ Reserva : "recebe"
-    Perfil ||--o{ Reserva : "faz_tipo_passageiro"
+    Usuario ||--o{ Reserva : "faz"
     Reserva ||--|{ ItemReserva : "contem"
 ```
 
@@ -57,16 +57,22 @@ erDiagram
 
 ### 2.2. Entidades de Domínio
 
-#### Usuario (Pessoa Física — base)
+#### Usuario (Conta Única — login + pessoa física)
 
 | Propriedade | Tipo | Descrição |
 |-------------|------|-----------|
 | Id | Guid | Chave primária |
 | Nome | string | Nome completo |
 | CPF | CPF | Value Object — **único no sistema**, imutável após cadastro |
+| Email | Email? | Value Object — **único no sistema**, usado para login. `null` para Motoristas que ainda não ativaram a conta |
+| SenhaHash | string? | Hash da senha (BCrypt). `null` para Motoristas que ainda não ativaram a conta |
+| Telefone | Telefone? | Value Object (nullable) |
+| Ativo | bool | Se a conta está ativa |
 | CriadoEm | DateTime | Data de criação |
 
-> Um **Usuario** representa uma **pessoa física** identificada pelo CPF. Pode ter múltiplos perfis.
+> Um **Usuario** é a **conta única** do sistema. O login é feito com Email + Senha do Usuario (apenas contas com `SenhaHash != null`). Pode ter múltiplos perfis (Passageiro, Gerente, Motorista, Admin). **Qualquer usuário logado pode reservar assentos** — independentemente do tipo de perfil.
+>
+> **Motorista sem login:** Quando o Gerente cadastra um Motorista, o sistema cria um Usuario com `Email = null` e `SenhaHash = null`. Este Usuario não pode fazer login até que a pessoa se registre como Passageiro (mesmo CPF) e defina email + senha. Nesse momento, o sistema ativa a conta e adiciona o Perfil Passageiro.
 
 #### Perfil (Papel do Usuario no sistema)
 
@@ -75,26 +81,22 @@ erDiagram
 | Id | Guid | Chave primária |
 | UsuarioId | Guid | FK → Usuario |
 | Tipo | TipoPerfil | Passageiro, Gerente, Motorista, Admin |
-| Email | Email | Value Object — único por Perfil, usado para login (nullable para Motorista) |
-| SenhaHash | string? | Hash da senha (nullable para Motorista — não faz login) |
-| Telefone | Telefone? | Value Object (nullable) |
 | Ativo | bool | Se o perfil está ativo |
 | CriadoPorPerfilId | Guid? | FK → Perfil (Gerente que cadastrou, apenas para Tipo=Motorista) |
 | CriadoEm | DateTime | Data de criação |
 
 **Campos específicos por Tipo:**
 
-| Campo | Passageiro | Gerente | Motorista | Admin |
-|-------|-----------|---------|-----------|-------|
-| Email | ✅ (login) | ✅ (login) | ❌ | ✅ |
-| SenhaHash | ✅ | ✅ | ❌ | ✅ |
-| Telefone | ✅ | ✅ | ✅ | ✅ |
-| Slug | ❌ | ✅ (único) | ❌ | ❌ |
-| TaxaPlataforma | ❌ | ✅ (%) | ❌ | ❌ |
-| Gratuito | ❌ | ✅ (bool) | ❌ | ❌ |
-| CNH | ❌ | ❌ | ✅ | ❌ |
+> Perfil Passageiro não possui campos específicos — usa apenas os dados do Usuario (Nome, CPF, Email, Telefone).
 
-> **Nota:** Slug, TaxaPlataforma e Gratuito são propriedades específicas do Perfil Gerente. CNH é específica do Perfil Motorista.
+| Campo | Gerente | Motorista | Admin |
+|-------|---------|-----------|-------|
+| Slug | ✅ (único) | ❌ | ❌ |
+| TaxaPlataforma | ✅ (%) | ❌ | ❌ |
+| Gratuito | ✅ (bool) | ❌ | ❌ |
+| CNH | ❌ | ✅ | ❌ |
+
+> **Nota:** Slug, TaxaPlataforma e Gratuito são propriedades específicas do Perfil Gerente. CNH é específica do Perfil Motorista. O **login** (Email + Senha) está no **Usuario**, não no Perfil.
 
 #### Van
 
@@ -121,8 +123,9 @@ erDiagram
 | DataPartida | DateTime | Data/hora de partida |
 | LocalPartida | string | Local de partida |
 | PrecoAssento | decimal | Preço do assento (igual para todas as vans) |
-| PossuiIngresso | bool | Se oferece ingresso |
-| PrecoIngresso | decimal? | Preço do ingresso (se houver) |
+| PossuiIngresso | bool | Se o gerente oferece opção de ingresso |
+| PrecoIngresso | decimal? | Preço do ingresso (quanto o gerente cobrará do passageiro) |
+| PrazoCompraIngresso | int | Prazo em horas para o gerente comprar o ingresso após solicitação (padrão: 24) |
 | Status | StatusViagem | Agendada, EmAndamento, Concluida, Cancelada |
 | CriadoEm | DateTime | Data de criação |
 
@@ -134,18 +137,16 @@ erDiagram
 | ViagemId | Guid | FK → Viagem |
 | VanId | Guid | FK → Van |
 | MotoristaPerfilId | Guid? | FK → Perfil.Id (Tipo=Motorista, opcional, alocado posteriormente) |
-| QuantidadeIngressos | int? | Ingressos comprados pelo gerente para esta van |
-| IngressosDisponiveis | int? | Ingressos ainda disponíveis nesta van |
+| IngressosDisponiveis | int | Ingressos que o gerente está disposto a comprar para esta van (limite máximo de solicitações) |
 
 > **Assentos Virtuais:** A capacidade de assentos é derivada diretamente de `Van.Capacidade` (ex: 16 = 15 assentos + motorista). Não existem registros previamente criados de assentos. A disponibilidade é calculada subtraindo os `ItemReserva.NumeroAssento` já registrados para aquela `ViagemVan` do total de assentos disponíveis (`Van.Capacidade - 1`). O usuário escolhe o número do assento no momento da reserva, e o sistema valida se ele já está ocupado por outro `ItemReserva`.
 
 #### Perfil Motorista (Driver)
 
-> O Motorista é um **Perfil** (Tipo=Motorista) vinculado a um Usuario. Não possui login. As propriedades abaixo são os dados específicos do perfil Motorista — o Nome e CPF estão no Usuario.
+> O Motorista é um **Perfil** (Tipo=Motorista) vinculado a um Usuario. Quando o Gerente cadastra o Motorista, o Usuario é criado com `Email = null` e `SenhaHash = null` — o Motorista **não possui login inicialmente**. A pessoa pode depois **ativar a conta** registrando-se como Passageiro com o mesmo CPF (define email + senha). As propriedades abaixo são os dados específicos do perfil Motorista — Nome, CPF e Telefone estão no Usuario.
 
 | Propriedade | Específica do Perfil Motorista | Descrição |
 |-------------|-------------------------------|-----------|
-| Telefone | Telefone? | Value Object |
 | CNH | string | Número da CNH |
 | Ativo | bool | Se ainda trabalha com o gerente |
 | CriadoPorPerfilId | Guid | FK → Perfil.Id do Gerente que cadastrou |
@@ -155,9 +156,8 @@ erDiagram
 | Propriedade | Tipo | Descrição |
 |-------------|------|-----------|
 | Id | Guid | Chave primária |
-| UsuarioId | Guid | FK → Usuario (responsável pela reserva) |
+| UsuarioId | Guid | FK → Usuario (responsável pela reserva — qualquer usuário logado pode reservar) |
 | ViagemVanId | Guid | FK → ViagemVan (van específica na viagem) |
-| PerfilPassageiroId | Guid | FK → Perfil.Id (Tipo=Passageiro do responsável) |
 | Status | StatusReserva | PendentePagamento, Confirmada, EmAndamento, Concluida, Cancelada, Expirada |
 | ValorTotal | decimal | Valor total (soma dos itens) |
 | TaxaPlataforma | decimal | Taxa calculada do VanBora |
@@ -174,14 +174,27 @@ erDiagram
 | Id | Guid | Chave primária |
 | ReservaId | Guid | FK → Reserva |
 | NumeroAssento | int | Número do assento escolhido pelo usuário. Ex: 1 a 15 (se Van.Capacidade = 16) |
-| PossuiIngresso | bool | Se inclui ingresso |
 | PrecoAssento | decimal | Preço do assento (snapshot) |
-| PrecoIngresso | decimal? | Preço do ingresso (snapshot) |
-| LinkIngresso | string? | Link para Face ID (enviado após pagamento) |
 | NomePassageiro | string | Nome do passageiro |
 | EmailPassageiro | string | Email do passageiro |
 | TelefonePassageiro | string | Telefone do passageiro |
 | CPFPassageiro | string | CPF do passageiro |
+| **Campos de Ingresso (preenchidos após pagamento, se solicitado)** |
+| PossuiIngresso | bool | Se o passageiro solicitou ingresso para este assento |
+| PrecoIngresso | decimal? | Preço do ingresso (snapshot no momento da solicitação) |
+| StatusTicket | StatusTicket | NaoSolicitado, AguardandoPagamento, PagoGerente, EmCompra, Comprado, Entregue, Reembolsado |
+| AutorizadoGerenteCompra | bool | Checkbox 1: autoriza gerente a comprar em seu nome |
+| ConsentimentoSemReembolso | bool | Checkbox 2: concorda que não há reembolso após receber |
+| ConsentimentoFaceId | bool | Checkbox 3: autoriza cadastro de Face ID |
+| EmailParaIngresso | string? | Email onde receberá o ingresso (pode ser diferente do email do perfil) |
+| SolicitadoEm | DateTime? | Quando o passageiro solicitou o ingresso |
+| PagoGerenteEm | DateTime? | Quando o passageiro pagou o gerente |
+| CompradoEm | DateTime? | Quando o gerente comprou o ingresso no site do clube |
+| EntregueEm | DateTime? | Quando o gerente enviou o ingresso por email |
+
+> **Nota sobre pagamento:** O pagamento do ingresso é feito **diretamente ao gerente** (fora do VanBora). Os campos `PagoGerenteEm` e `StatusTicket` são atualizados pelo gerente no sistema para registro e rastreamento.
+>
+> **Nota sobre Face ID:** O campo `ConsentimentoFaceId` registra apenas a **autorização** do passageiro para cadastro de Face ID. O cadastro em si é feito pelo **próprio passageiro no portal do evento** (site oficial de venda de ingressos), usando o link recebido por email após o gerente comprar o ingresso. O VanBora não cadastra Face ID.
 
 ### 2.3. Value Objects
 
@@ -262,6 +275,17 @@ public enum StatusReserva
     Cancelada,
     Expirada
 }
+
+public enum StatusTicket
+{
+    NaoSolicitado,
+    AguardandoPagamento,
+    PagoGerente,
+    EmCompra,
+    Comprado,
+    Entregue,
+    Reembolsado
+}
 ```
 
 ---
@@ -270,24 +294,25 @@ public enum StatusReserva
 
 ### 3.1. Autenticação e Perfil
 
+> **Modelo:** Login único com Email + Senha do **Usuario**. Perfis (Passageiro, Gerente, Admin) definem capacidades. Qualquer usuário logado pode reservar assentos.
+
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| POST | `/api/auth/registrar` | Registrar usuario + criar Perfil Passageiro |
-| POST | `/api/auth/login` | Login do passageiro (email + senha do Perfil Passageiro) |
-| POST | `/api/auth/gerente/registrar` | Registrar usuario + criar Perfil Gerente (ou adicionar perfil a usuario existente) |
-| POST | `/api/auth/gerente/login` | Login do gerente (email + senha do Perfil Gerente) |
+| POST | `/api/auth/registrar` | Criar Usuario + Perfil Passageiro (cadastro simples) |
+| POST | `/api/auth/login` | Login único (email + senha do Usuario) |
+| POST | `/api/auth/gerente/registrar` | Criar Perfil Gerente (cria Usuario se CPF não existir, ou adiciona a Usuario existente) |
 | GET | `/api/auth/me` | Dados do usuario logado + lista de perfis |
-| PUT | `/api/auth/usuario` | Atualizar dados do Usuario (nome) |
-| PUT | `/api/auth/perfil/passageiro` | Atualizar Perfil Passageiro (email, telefone) |
-| PUT | `/api/auth/perfil/gerente` | Atualizar Perfil Gerente (email, telefone, slug) |
-| POST | `/api/auth/alterar-senha` | Alterar senha do perfil logado |
+| PUT | `/api/auth/usuario` | Atualizar dados do Usuario (nome, email, telefone) |
+| PUT | `/api/auth/perfil/gerente` | Atualizar Perfil Gerente (slug) |
+| POST | `/api/auth/alterar-senha` | Alterar senha do Usuario |
 | POST | `/api/auth/solicitar-exclusao` | Solicitar exclusão de conta (envia código por email) |
 | POST | `/api/auth/confirmar-exclusao` | Confirmar exclusão da conta com código recebido |
 
 > **Fluxo de cadastro:**
-> - `POST /api/auth/registrar` → Recebe: `{ nome, email, cpf, telefone, senha }` → Cria Usuario + Perfil Passageiro
-> - `POST /api/auth/gerente/registrar` → Recebe: `{ nome, email, cpf, telefone, senha, slug }` → Busca Usuario por CPF (cria se não existir) + Cria Perfil Gerente
+> - `POST /api/auth/registrar` → Recebe: `{ nome, email, cpf, telefone, senha }` → Cria Usuario + Perfil Passageiro automaticamente. Usuário já pode reservar assentos.
+> - `POST /api/auth/gerente/registrar` → Recebe: `{ nome, email, cpf, telefone, senha, slug }` → Se CPF não existir, cria Usuario + Perfil Passageiro + Perfil Gerente. Se CPF já existir (ex: já é Passageiro), adiciona Perfil Gerente ao Usuario existente.
 > - Motorista é cadastrado via endpoint de Gerente (seção 3.4)
+> - **Login único:** Ambos os perfis usam o mesmo email e senha do Usuario para acessar o sistema.
 
 ### 3.2. Viagens — Público
 
@@ -315,7 +340,7 @@ public enum StatusReserva
 | PUT | `/api/gerente/motoristas/{id}` | Atualizar dados do motorista |
 | DELETE | `/api/gerente/motoristas/{id}` | Remover motorista |
 
-> **Cadastro de Motorista:** O gerente informa CPF, Nome, Telefone, CNH. O sistema busca um Usuario existente com esse CPF. Se existir, cria Perfil Motorista vinculado a ele. Se não existir, cria um novo Usuario + Perfil Motorista. O Motorista **não tem email nem senha** — não faz login no sistema.
+> **Cadastro de Motorista:** O gerente informa CPF, Nome, Telefone, CNH. O sistema busca um Usuario existente com esse CPF. Se existir, cria Perfil Motorista vinculado a ele. Se não existir, cria um novo Usuario com `Email = null` e `SenhaHash = null` + Perfil Motorista. O Motorista **não possui login inicialmente**, mas pode depois **ativar a conta** registrando-se como Passageiro com o mesmo CPF.
 
 ### 3.5. Gerente — Gestão de Viagens
 
@@ -338,10 +363,23 @@ public enum StatusReserva
 | POST | `/api/reservas` | Criar reserva (informando viagemVanId) |
 | GET | `/api/reservas/{id}` | Detalhes da reserva |
 | GET | `/api/reservas/minhas` | Listar reservas do usuario logado |
-| POST | `/api/reservas/{id}/pagar` | Gerar QR Code Pix |
+| POST | `/api/reservas/{id}/pagar` | Gerar QR Code Pix para pagamento do assento |
 | POST | `/api/reservas/{id}/cancelar` | Cancelar reserva |
+| POST | `/api/reservas/{id}/solicitar-ingressos` | Solicitar ingressos para itens da reserva (após pagamento do assento) |
+| GET | `/api/reservas/{id}/ingressos` | Status das solicitações de ingresso da reserva |
+| POST | `/api/reservas/{id}/ingressos/{itemReservaId}/confirmar-pagamento` | Passageiro confirma que pagou o gerente pelo ingresso |
 
-### 3.7. Admin VanBora
+### 3.7. Gerente — Gestão de Ingressos
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/api/gerente/ingressos/solicitacoes` | Listar solicitações de ingresso pendentes |
+| GET | `/api/gerente/viagens/{viagemId}/ingressos` | Listar solicitações de ingresso de uma viagem |
+| POST | `/api/gerente/ingressos/{itemReservaId}/comprar` | Gerente marca que comprou o ingresso no site do clube |
+| POST | `/api/gerente/ingressos/{itemReservaId}/entregue` | Gerente confirma que enviou o ingresso por email |
+| POST | `/api/gerente/ingressos/{itemReservaId}/reembolsar` | Gerente reembolsa o ingresso (caso não consiga comprar) |
+
+### 3.8. Admin VanBora
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
@@ -365,6 +403,7 @@ sequenceDiagram
     participant API as API
     participant DB as Database
     participant PG as Payment Gateway
+    participant G as Gerente
     
     U->>API: GET /api/viagens
     API->>DB: Buscar viagens disponíveis
@@ -377,16 +416,15 @@ sequenceDiagram
     API-->>U: Evento, preços, vans disponíveis
     
     U->>API: GET /api/viagens/{id}/vans
-    API->>DB: Buscar vans + calcular assentos disponíveis\n(Van.Capacidade - 1 - assentos ocupados em ItemReserva)
-    DB-->>API: Vans + assentos disponíveis (números livres)
+    API->>DB: Buscar vans + calcular assentos disponíveis
+    DB-->>API: Vans + assentos disponíveis
     API-->>U: Escolher van + números dos assentos
     
     U->>API: POST /api/reservas
-    Note over U,API: Body: viagemVanId, itens[{numeroAssento, passageiroInfo, possuiIngresso}]
-    API->>DB: Validar se numeroAssento está disponível\n(verificar ItemReserva existentes)
-    API->>DB: Validar ingressosDisponiveis (se possuiIngresso)
-    API->>DB: Criar Reserva (PendentePagamento)
-    API->>DB: Criar ItensReserva (já registra os assentos)
+    Note over U,API: Body: viagemVanId, itens[{numeroAssento, passageiroInfo}]
+    API->>DB: Validar disponibilidade dos assentos
+    API->>DB: Criar Reserva PendentePagamento
+    API->>DB: Criar ItensReserva
     API->>PG: Gerar QR Code Pix
     PG-->>API: QR Code + transacaoId
     API->>DB: Atualizar codigoPix
@@ -396,17 +434,38 @@ sequenceDiagram
     PG-->>API: Webhook: pagamento confirmado
     
     API->>DB: Atualizar status → Confirmada
-    Note over API,DB: Assentos já estão registrados via ItemReserva\n(apenas mudam de pendente para confirmados)
-    API->>DB: Reduzir ingressosDisponiveis na ViagemVan
+    API->>U: Email: reserva confirmada
     
-    alt Itens com ingresso
-        API->>U: Enviar email com link Face ID
-    else Somente assento
-        API->>U: Enviar email de confirmação
+    Note over U,API: --- FLUXO DO INGRESSO (opcional, separado) ---
+    
+    alt Passageiro opta por solicitar ingresso
+        U->>API: POST /api/reservas/{id}/solicitar-ingressos
+        Note over U,API: Body: itens[{itemReservaId, possuiIngresso, email, checkboxes}]
+        API->>DB: Validar max ingressos ≤ assentos na reserva
+        API->>DB: Atualizar campos de ticket nos ItensReserva
+        API-->>U: Tela de confirmação + resumo dos ingressos solicitados
+        
+        Note over U,G: Passageiro paga o gerente diretamente via Pix
+        
+        U->>API: POST /api/reservas/{id}/ingressos/{itemId}/confirmar-pagamento
+        API->>DB: Atualizar StatusTicket = PagoGerente
+        API-->>G: Notificar: passageiro pagou, comprar ingresso
+        
+        G->>API: POST /api/gerente/ingressos/{itemId}/comprar
+        Note over G: Gerente compra ingresso no site do clube
+        API->>DB: Atualizar StatusTicket = Comprado
+        
+        G->>API: POST /api/gerente/ingressos/{itemId}/entregue
+        Note over G: Gerente envia ingresso por email
+        API->>DB: Atualizar StatusTicket = Entregue
+        API->>U: Email: ingresso recebido
+        
+    else Passageiro não solicita ingresso
+        API->>U: Email: confirmação final (somente assento)
     end
 ```
 
-### 4.1. Fluxo de Login com Múltiplos Perfis
+### 4.1. Fluxo de Login Único
 
 ```mermaid
 sequenceDiagram
@@ -415,21 +474,16 @@ sequenceDiagram
     participant DB as Database
     
     U->>API: POST /api/auth/login\n{ email, senha }
-    API->>DB: Buscar Perfil com Email + Senha válidos
-    DB-->>API: Perfil encontrado (Passageiro | Gerente)
-    API->>DB: Buscar outros perfis do mesmo Usuario
-    DB-->>API: Lista de perfis do usuario
+    API->>DB: Buscar Usuario com Email + Senha válidos
+    DB-->>API: Usuario encontrado
+    API->>DB: Buscar perfis do Usuario
+    DB-->>API: Lista de perfis [Passageiro, Gerente]
     
-    Note over API: JWT claims:\nsub = UsuarioId\nperfil_atual = Passageiro\nperfis = [Passageiro, Gerente]\nemail = email_do_perfil
+    Note over API: JWT claims:\nsub = UsuarioId\nemail = email_do_usuario\nperfis = [Passageiro, Gerente]\nnome = Nome do Usuario
     
     API-->>U: JWT + lista de perfis disponíveis
     
-    Note over U: Usuário pode alternar entre perfis\n(se tiver múltiplos)
-    
-    U->>API: POST /api/auth/alternar-perfil\n{ perfilId: gerente_id }
-    API->>DB: Validar que usuario tem este perfil
-    DB-->>API: Ok
-    API-->>U: Novo JWT com perfil_atual = Gerente
+    Note over U: Único login para todos os perfis.\nQualquer usuario logado pode reservar.\nOperações de Gerente usam perfil_id no header.
 ```
 
 ---
@@ -513,11 +567,16 @@ VanBora.sln
 > - Renomeado: `AuthService` agora lida com Perfis, não entidades separadas
 >
 > **Decisões de implementação:**
+> - **Login único:** Email + Senha no Usuario. Todos os perfis compartilham o mesmo login
+> - **Reserva para todos:** Qualquer usuário logado pode reservar assentos, independente do tipo de perfil (Passageiro, Gerente, Admin)
 > - **CPF:** Todos os cadastros (Passageiro, Gerente, Motorista) reutilizam Usuario existente pelo CPF
 > - **Soft delete:** Todas as exclusões são lógicas (Ativo = false), nunca exclusão física
 > - **0800:** Primeiros 2 gerentes do sistema recebem gratuito = true automaticamente; Admin pode ajustar taxas individualmente via `PUT /api/admin/gerentes/{id}`
 > - **Reembolso:** Automático via Pix quando gerente cancela viagem ou remove van com reservas
 > - **Capacidade da van:** Imutável após criação, sem exceções
+> - **Ingresso:** VanBora não vende ingressos. A solicitação ocorre após o pagamento do assento. O passageiro autoriza o gerente a comprar, paga diretamente ao gerente, e o gerente compra no site do clube
+> - **Split payment:** Assento → Pix VanBora. Ingresso → Pix Gerente (fora da plataforma)
+> - **Max ingressos:** O passageiro pode solicitar no máximo 1 ingresso por assento reservado
 
 ---
 
@@ -543,9 +602,9 @@ VanBora.sln
 |---|------|-----------|
 | 1.1 | Configurar projetos | Adicionar referências entre camadas, instalar pacotes NuGet |
 | 1.2 | Criar Value Objects | Email, CPF, Telefone, Placa, Dinheiro (com validações) |
-| 1.3 | Criar Enums | TipoPerfil, StatusViagem, StatusReserva |
-| 1.4 | Criar entidades de domínio | Usuario, Perfil, Van, Viagem, ViagemVan, Reserva, ItemReserva (usando VOs) |
-| 1.5 | Criar interfaces de repositório | IUsuarioRepository, IPerfilRepository, IVanRepository, IViagemRepository, IViagemVanRepository, IReservaRepository, IUnitOfWork |
+| 1.3 | Criar Enums | TipoPerfil, StatusViagem, StatusReserva, **StatusTicket** |
+| 1.4 | Criar entidades de domínio | Usuario, Perfil, Van, Viagem, ViagemVan, Reserva, ItemReserva (usando VOs) — ItemReserva inclui campos de ticket |
+| 1.5 | Criar interfaces de repositório | IUsuarioRepository, IPerfilRepository, IVanRepository, IViagemRepository, IViagemVanRepository, IReservaRepository, IItemReservaRepository, IUnitOfWork |
 
 ### Fase 2 — Infraestrutura
 
@@ -561,11 +620,12 @@ VanBora.sln
 | # | Task | Descrição |
 |---|------|-----------|
 | 3.1 | Criar DTOs + FluentValidation | Request/Response DTOs e validadores |
-| 3.2 | Implementar AuthService | Registrar/login com Perfis, alternar perfis, JWT com claims |
-| 3.3 | Implementar ViagemService | CRUD de viagens + alocação de vans |
+| 3.2 | Implementar AuthService | Registrar (Usuario + Passageiro automático), registrar Gerente (cria ou reutiliza Usuario), login único (email + senha do Usuario), JWT com claims (sub, email, perfis[], nome) |
+| 3.3 | Implementar ViagemService | CRUD de viagens + alocação de vans (inclui campo PrazoCompraIngresso) |
 | 3.4 | Implementar VanService | CRUD de vans |
 | 3.5 | Implementar MotoristaService | CRUD de motoristas (cria Perfil Tipo=Motorista) |
-| 3.6 | Implementar ReservaService | Criar reserva, validar disponibilidade, processar pagamento, enviar emails |
+| 3.6 | Implementar ReservaService | Criar reserva, validar disponibilidade, processar pagamento do assento, enviar emails |
+| 3.7 | Implementar IngressoService | Solicitar ingressos, validar limite (max = assentos), autorizações, confirmar pagamento ao gerente, notificar gerente |
 
 ### Fase 4 — API
 
@@ -573,13 +633,14 @@ VanBora.sln
 |---|------|-----------|
 | 4.1 | AuthController | Endpoints de autenticação (registro, login, alternar perfil) |
 | 4.2 | ViagensController | Endpoints públicos de viagens |
-| 4.3 | ReservasController | CRUD de reservas |
+| 4.3 | ReservasController | CRUD de reservas + solicitar ingressos, confirmar pagamento ao gerente |
 | 4.4 | Gerente/VansController | Gestão de vans |
 | 4.5 | Gerente/MotoristasController | CRUD de motoristas |
 | 4.6 | Gerente/ViagensController | Gestão de viagens + alocação de vans e motoristas |
-| 4.7 | Admin/GerentesController | Gestão de gerentes |
-| 4.8 | Admin/UsuariosController | Gestão de usuarios (busca, histórico, perfis) |
-| 4.9 | Middleware | Exception handling |
+| 4.7 | Gerente/IngressosController | Listar solicitações, marcar como comprado, entregue, reembolsar |
+| 4.8 | Admin/GerentesController | Gestão de gerentes |
+| 4.9 | Admin/UsuariosController | Gestão de usuarios (busca, histórico, perfis) |
+| 4.10 | Middleware | Exception handling |
 
 ### Fase 5 — Integrações e Testes
 
@@ -599,15 +660,14 @@ O JWT conterá as seguintes claims:
 ```json
 {
   "sub": "guid-do-usuario",
-  "email": "email-do-perfil-logado",
-  "perfil_atual": "Gerente",
+  "email": "email-do-usuario",
   "perfis": ["Passageiro", "Gerente"],
-  "perfil_id": "guid-do-perfil-atual",
   "nome": "João Silva"
 }
 ```
 
-- O usuário faz login com email + senha de um Perfil específico
-- O JWT reflete o perfil atual e lista todos os perfis disponíveis
-- O endpoint `POST /api/auth/alternar-perfil` permite trocar o `perfil_atual` sem precisar fazer login novamente
-- As permissões de acesso a endpoints são baseadas no `perfil_atual` claim
+- O login é feito com email + senha do **Usuario** (único para todos os perfis)
+- O JWT lista todos os perfis que o usuário possui
+- Qualquer usuário logado pode acessar endpoints de reserva (não precisa ser Passageiro)
+- Endpoints de Gerente (criar viagens, gerenciar vans) exigem que o usuário tenha Perfil Gerente e informem o `perfil_id` no header da requisição
+- Para usuários com múltiplos Perfis Gerente, o header `X-Perfil-Id` define qual gerente está sendo usado

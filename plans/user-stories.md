@@ -7,33 +7,34 @@
 ## US01 — Cadastro de Gerente (Usuario + Perfil Gerente)
 
 **Como** um gerente de van
-**Quero** me cadastrar na plataforma VanBora (criar Usuario + Perfil Gerente)
+**Quero** me cadastrar na plataforma VanBora como gerente (criar Usuario + Perfil Passageiro + Perfil Gerente)
 **Para** gerenciar minhas vans e criar viagens
 
-> **Modelo:** O cadastro cria um **Usuario** (pessoa física, CPF único) e um **Perfil Gerente** vinculado. Se o CPF já existir (ex: a pessoa já é Passageiro), o sistema apenas adiciona o Perfil Gerente ao Usuario existente.
+> **Modelo:** O cadastro de gerente cria um **Usuario** (conta única com email/senha), um **Perfil Passageiro** automático e um **Perfil Gerente**. Se o CPF já existir (ex: a pessoa já se cadastrou como passageiro), o sistema apenas adiciona o Perfil Gerente ao Usuario existente. O login é único (email + senha do Usuario), e o gerente também pode reservar assentos em viagens de outros gerentes.
 
 ### Cenários de Aceitação
 
 ```gherkin
-Cenário: Cadastro bem-sucedido (novo Usuario)
+Cenário: Cadastro bem-sucedido (novo Usuario + Gerente)
   Dado que não existe um Usuario com o CPF informado
   Quando envio meus dados (nome, cpf, email, telefone, senha, slug)
   Então um novo Usuario é criado
-  E um Perfil Gerente é vinculado a ele
-  E recebo um token JWT com perfil_atual = Gerente
+  E um Perfil Passageiro é criado automaticamente
+  E um Perfil Gerente é vinculado
+  E recebo um token JWT com perfis = [Passageiro, Gerente]
 
-Cenário: Cadastro com CPF existente (adicionar perfil)
-  Dado que já existe um Usuario com CPF "12345678909"
+Cenário: Cadastro com CPF existente (adicionar Gerente)
+  Dado que já existe um Usuario com CPF "12345678909" (ex: já é Passageiro)
   Quando envio dados de cadastro de gerente com o mesmo CPF
-  Então um novo Perfil Gerente é adicionado ao Usuario existente
-  E recebo um token JWT com perfil_atual = Gerente
-  E o JWT lista perfis = [Passageiro, Gerente]
+  Então o Usuario existente é reutilizado
+  E um novo Perfil Gerente é adicionado
+  E recebo um token JWT com perfis = [Passageiro, Gerente]
 
-Cenário: Email duplicado entre Perfis Gerente
-  Dado que já existe um Perfil Gerente com email "contato@transpabc.com"
-  Quando tento cadastrar outro gerente com o mesmo email
+Cenário: Email duplicado
+  Dado que já existe um Usuario com email "contato@transpabc.com"
+  Quando tento cadastrar outro Usuario com o mesmo email
   Então recebo um erro 409 Conflict
-  E a mensagem "Email já cadastrado para outro gerente"
+  E a mensagem "Email já cadastrado"
 
 Cenário: Slug duplicado
   Dado que já existe um gerente com slug "transp-abc"
@@ -66,35 +67,40 @@ Cenário: Dados inválidos
 ```json
 {
   "usuarioId": "u1u2u3u4-...",
-  "perfilId": "p1p2p3p4-...",
   "nome": "Transportadora ABC",
-  "slug": "transp-abc",
   "email": "contato@transpabc.com",
   "telefone": "11999999999",
-  "ativo": true,
-  "taxaPlataforma": 5.0,
-  "gratuito": false,
-  "criadoEm": "2026-05-04T12:00:00Z",
-  "perfis": ["Gerente"],
+  "cpf": "12345678909",
+  "gerente": {
+    "perfilId": "p1p2p3p4-...",
+    "slug": "transp-abc",
+    "taxaPlataforma": 5.0,
+    "gratuito": false,
+    "ativo": true
+  },
+  "perfis": ["Passageiro", "Gerente"],
   "token": "eyJhbGciOi..."
 }
 ```
 
 ---
 
-## US02 — Login de Gerente
+## US02 — Login (único para todos os perfis)
 
-**Como** um gerente de van cadastrado
-**Quero** fazer login na plataforma
-**Para** acessar minhas funcionalidades de gestão
+**Como** um usuário cadastrado
+**Quero** fazer login na plataforma com meu email e senha únicos
+**Para** acessar minhas funcionalidades (reservar, gerenciar, etc.)
+
+> **Login único:** O login é feito com Email + Senha do **Usuario**, independente de quantos perfis a pessoa tem. O JWT retorna a lista de perfis disponíveis.
 
 ### Cenários de Aceitação
 
 ```gherkin
 Cenário: Login bem-sucedido
-  Dado que estou cadastrado com email "contato@transpabc.com"
+  Dado que estou cadastrado com email "joao@email.com"
   Quando informo meu email e senha corretos
   Então recebo um token JWT válido
+  E o JWT contém meus perfis ["Passageiro", "Gerente"]
 
 Cenário: Senha incorreta
   Dado que estou cadastrado
@@ -106,14 +112,20 @@ Cenário: Conta inativa
   Quando tento fazer login
   Então recebo um erro 403 Forbidden
   E a mensagem "Conta desativada"
+
+Cenário: Login como Gerente (mesmo endpoint)
+  Dado que sou gerente com email "contato@transpabc.com"
+  Quando faço login com meu email e senha
+  Então recebo o mesmo token JWT
+  E posso acessar rotas de gerente e também reservar assentos
 ```
 
 ### Exemplo
 
-**Requisição:** `POST /api/auth/gerente/login`
+**Requisição:** `POST /api/auth/login`
 ```json
 {
-  "email": "contato@transpabc.com",
+  "email": "joao@email.com",
   "senha": "MinhaSenha123"
 }
 ```
@@ -121,52 +133,55 @@ Cenário: Conta inativa
 **Resposta (200):**
 ```json
 {
-  "id": "a1b2c3d4-...",
-  "nome": "Transportadora ABC",
-  "email": "contato@transpabc.com",
+  "usuarioId": "u1u2u3u4-...",
+  "nome": "João Silva",
+  "email": "joao@email.com",
+  "perfis": ["Passageiro", "Gerente"],
   "token": "eyJhbGciOi..."
 }
 ```
 
 ---
 
-## US03 — Cadastro de Usuário Passageiro (Usuario + Perfil Passageiro)
+## US03 — Cadastro de Usuário (Usuario + Perfil Passageiro automático)
 
-**Como** um passageiro
+**Como** um usuário
 **Quero** me cadastrar na plataforma VanBora
 **Para** fazer reservas em viagens
 
-> **Modelo:** O cadastro cria um **Usuario** (pessoa física, CPF único) e um **Perfil Passageiro**. Se o CPF já existir (ex: a pessoa já é Gerente), o sistema reutiliza o Usuario e adiciona o Perfil Passageiro.
+> **Modelo:** O cadastro cria um **Usuario** (conta única com email/senha) e um **Perfil Passageiro** automaticamente. Login único com email + senha do Usuario. Se o CPF já existir no sistema com `SenhaHash = null` (ex: Motorista cadastrado pelo Gerente sem login), o sistema entende como **ativação de conta pendente** e completa o registro.
 
 ### Cenários de Aceitação
 
 ```gherkin
-Cenário: Cadastro bem-sucedido (novo Usuario)
-  Dado que não existe Usuario com este CPF
+Cenário: Cadastro bem-sucedido
+  Dado que não existe Usuario com este email
   Quando envio meus dados (nome, email, cpf, telefone, senha)
   Então um novo Usuario é criado
-  E um Perfil Passageiro é vinculado
-  E recebo um token JWT com perfil_atual = Passageiro
+  E um Perfil Passageiro é vinculado automaticamente
+  E recebo um token JWT com perfis = ["Passageiro"]
+  E já posso reservar assentos imediatamente
 
-Cenário: CPF já existente (adicionar perfil)
-  Dado que já existe um Usuario com CPF "12345678909" (ex: como Gerente)
-  Quando envio dados de cadastro de passageiro com o mesmo CPF
+Cenário: CPF já existe como Motorista sem login (ativação de conta)
+  Dado que existe um Usuario com CPF "12345678909" mas SenhaHash = null (ex: Motorista cadastrado pelo Gerente)
+  Quando me registro com o mesmo CPF informando email e senha
   Então o Usuario existente é reutilizado
-  E um novo Perfil Passageiro é vinculado a ele
-  E recebo um token JWT com perfil_atual = Passageiro
-  E o JWT lista perfis = [Gerente, Passageiro]
+  E o email e senha são definidos (conta ativada)
+  E um Perfil Passageiro é adicionado (se não existir)
+  E recebo um token JWT com perfis = ["Passageiro", "Motorista"]
+  E agora posso fazer login e reservar assentos
+
+Cenário: Email duplicado
+  Dado que já existe um Usuario com email "joao@email.com"
+  Quando tento cadastrar com o mesmo email
+  Então recebo um erro 409 Conflict
+  E a mensagem "Email já cadastrado"
 
 Cenário: CPF inválido
   Dado que envio um CPF com dígitos inválidos
   Quando tento cadastrar
   Então recebo um erro 400
   E a mensagem "CPF inválido"
-
-Cenário: Email já cadastrado em outro Perfil
-  Dado que já existe um Perfil com email "joao@email.com"
-  Quando tento cadastrar com o mesmo email
-  Então recebo um erro 409 Conflict
-  E a mensagem "Email já cadastrado"
 ```
 
 ### Exemplo
@@ -184,29 +199,29 @@ Cenário: Email já cadastrado em outro Perfil
 
 ---
 
-## US04 — Login de Usuário
+## US04 — Login de Usuário (mesmo endpoint do US02)
 
-**Como** um passageiro cadastrado
-**Quero** fazer login na plataforma
-**Para** acessar minhas reservas e criar novas
+> **Nota:** O login é **único** para todos os tipos de usuário. Veja US02 para detalhes completos. O mesmo endpoint `POST /api/auth/login` atende Passageiros, Gerentes e Admins.
 
 ### Cenários de Aceitação
 
 ```gherkin
-Cenário: Login bem-sucedido
-  Dado que estou cadastrado com email "joao@email.com"
-  Quando informo meu email e senha corretos
-  Então recebo um token JWT válido
+Cenário: Login como passageiro
+  Dado que me cadastrei como usuario com email "joao@email.com"
+  Quando faço login com meu email e senha
+  Então recebo um token JWT com perfis = ["Passageiro"]
+  E posso criar reservas
 
-Cenário: Senha incorreta
-  Dado que estou cadastrado
-  Quando informo a senha errada
-  Então recebo um erro 401 Unauthorized
+Cenário: Login como usuario com multiplos perfis
+  Dado que tenho perfis Passageiro e Gerente
+  Quando faço login
+  Então recebo um token JWT com perfis = ["Passageiro", "Gerente"]
+  E posso reservar assentos e também gerenciar viagens
 ```
 
 ### Exemplo
 
-**Requisição:** `POST /api/auth/login`
+**Requisição:** `POST /api/auth/login` (mesmo do US02)
 ```json
 {
   "email": "joao@email.com",
@@ -217,9 +232,10 @@ Cenário: Senha incorreta
 **Resposta (200):**
 ```json
 {
-  "id": "b2c3d4e5-...",
+  "usuarioId": "b2c3d4e5-...",
   "nome": "João Silva",
   "email": "joao@email.com",
+  "perfis": ["Passageiro"],
   "token": "eyJhbGciOi..."
 }
 ```
@@ -489,37 +505,33 @@ Cenário: Viagem sem vans alocadas
 
 ## US09 — Criar Reserva
 
-**Como** um passageiro logado
+**Como** um usuário logado
 **Quero** reservar um ou mais assentos em uma viagem
 **Para** garantir meu lugar no evento
+
+> **Nota:** A reserva inicial é **somente para assentos**. O ingresso é solicitado **após** o pagamento do assento ser confirmado, em um fluxo separado (ver US28). **Qualquer usuário logado pode reservar** — independente de ter perfil Passageiro, Gerente ou Admin.
 
 ### Cenários de Aceitação
 
 ```gherkin
-Cenário: Reserva de 1 assento sem ingresso
+Cenário: Reserva de 1 assento
   Dado que estou logado
-  Quando reservo 1 assento (número 5) sem ingresso
+  Quando reservo 1 assento (número 5)
   Então a reserva é criada com status "PendentePagamento"
-  E o valorTotal é calculado (precoAssento × 1)
+  E o valorTotal = precoAssento × 1
   E a taxaPlataforma é calculada
 
-Cenário: Reserva de 2 assentos, 1 com ingresso
+Cenário: Reserva de 2 assentos
   Dado que estou logado
-  Quando reservo 2 assentos (números 5 e 6), sendo o assento 5 com ingresso
+  Quando reservo 2 assentos (números 5 e 6)
   Então a reserva contém 2 itens
-  E o valorTotal = precoAssento×2 + precoIngresso×1
+  E o valorTotal = precoAssento × 2
 
 Cenário: Assento já ocupado
   Dado que o assento 5 já foi reservado por outro usuário
   Quando tento reservar o assento 5
   Então recebo um erro 409
   E a mensagem "Assento 5 já está ocupado"
-
-Cenário: Ingresso indisponível
-  Dado que a van tem 0 ingressosDisponiveis
-  Quando tento reservar com possuiIngresso = true
-  Então recebo um erro 400
-  E a mensagem "Ingressos esgotados para esta van"
 
 Cenário: Primeiros 2 clientes são 0800
   Dado que sou um dos 2 primeiros clientes do gerente
@@ -548,7 +560,6 @@ Cenário: Reserva expira em 10 minutos
   "itens": [
     {
       "numeroAssento": 5,
-      "possuiIngresso": true,
       "nomePassageiro": "João Silva",
       "emailPassageiro": "joao@email.com",
       "telefonePassageiro": "11988888888",
@@ -556,7 +567,6 @@ Cenário: Reserva expira em 10 minutos
     },
     {
       "numeroAssento": 6,
-      "possuiIngresso": false,
       "nomePassageiro": "Maria Souza",
       "emailPassageiro": "maria@email.com",
       "telefonePassageiro": "11977777777",
@@ -572,24 +582,26 @@ Cenário: Reserva expira em 10 minutos
   "id": "f6a7b8c9-...",
   "viagemVanId": "e5f6a7b8-...",
   "status": "PendentePagamento",
-  "valorTotal": 329.80,
-  "taxaPlataforma": 16.49,
+  "valorTotal": 179.80,
+  "taxaPlataforma": 8.99,
   "codigoPix": "000201010212...",
   "expiraEm": "2026-05-04T12:15:00Z",
   "criadoEm": "2026-05-04T12:00:00Z",
   "itens": [
     {
+      "id": "item1-...",
       "numeroAssento": 5,
-      "possuiIngresso": true,
       "precoAssento": 89.90,
-      "precoIngresso": 150.00,
+      "possuiIngresso": false,
+      "statusTicket": "NaoSolicitado",
       "nomePassageiro": "João Silva"
     },
     {
+      "id": "item2-...",
       "numeroAssento": 6,
-      "possuiIngresso": false,
       "precoAssento": 89.90,
-      "precoIngresso": null,
+      "possuiIngresso": false,
+      "statusTicket": "NaoSolicitado",
       "nomePassageiro": "Maria Souza"
     }
   ]
@@ -598,11 +610,13 @@ Cenário: Reserva expira em 10 minutos
 
 ---
 
-## US10 — Pagar Reserva
+## US10 — Pagar Reserva (Assento)
 
-**Como** um passageiro com reserva pendente
-**Quero** gerar o QR Code Pix e efetuar o pagamento
+**Como** um usuário logado com reserva pendente
+**Quero** gerar o QR Code Pix e efetuar o pagamento do assento
 **Para** confirmar minha reserva
+
+> **Nota:** Este pagamento cobre **apenas o assento**. O ingresso, se desejado, é pago separadamente em fluxo posterior (ver US28).
 
 ### Cenários de Aceitação
 
@@ -617,7 +631,7 @@ Cenário: Webhook de pagamento confirmado
   Quando recebo o webhook
   Então a reserva muda para status "Confirmada"
   E os ingressosDisponiveis são reduzidos na ViagemVan
-  E um email é enviado com o link Face ID (se houver ingressos)
+  E um email de confirmação é enviado
 
 Cenário: Tentar pagar reserva já confirmada
   Dado que a reserva já está paga
@@ -659,7 +673,7 @@ Cenário: Tentar pagar reserva expirada
 
 ## US11 — Cancelar Reserva
 
-**Como** um passageiro
+**Como** um usuário logado
 **Quero** cancelar minha reserva
 **Para** liberar os assentos caso não possa ir
 
@@ -802,7 +816,7 @@ Cenário: Ativar 0800 (gratuito)
 
 ## US14 — Ver Minhas Reservas
 
-**Como** um passageiro logado
+**Como** um usuário logado
 **Quero** ver minhas reservas
 **Para** acompanhar o status e detalhes
 
@@ -987,55 +1001,48 @@ Cenário: Van não encontrada
 
 ---
 
-## US18 — Atualizar Perfil do Passageiro
+## US18 — Atualizar Usuario (dados compartilhados entre perfis)
 
-**Como** um passageiro logado
-**Quero** atualizar meus dados pessoais
+**Como** um usuário logado
+**Quero** atualizar meus dados pessoais (nome, email, telefone)
 **Para** manter meu cadastro sempre atualizado
 
-> **Modelo:** O nome fica no **Usuario** (compartilhado entre perfis). Email, telefone e senha ficam no **Perfil Passageiro**.
+> **Modelo:** Nome, email e telefone ficam no **Usuario** (compartilhado entre todos os perfis). Alterar esses dados reflete em todos os perfis (Passageiro, Gerente, etc.). A senha é alterada em endpoint separado (`POST /api/auth/alterar-senha` — ver US21). CPF é imutável.
 
 ### Cenários de Aceitação
 
 ```gherkin
-Cenário: Atualizar nome do Usuario
-  Dado que estou logado com perfil Passageiro
+Cenário: Atualizar nome com sucesso
+  Dado que estou logado
   Quando atualizo meu nome
-  Então o nome é alterado em todas as visualizações (compartilhado entre perfis)
+  Então o nome é alterado em todos os perfis do Usuario
 
-Cenário: Atualizar email e telefone do Perfil
-  Dado que estou logado com perfil Passageiro
-  Quando atualizo meu email e telefone
-  Então os dados do Perfil Passageiro são alterados
+Cenário: Atualizar email
+  Dado que estou logado
+  Quando atualizo meu email
+  Então o email é alterado e passa a ser usado para login
+
+Cenário: Email duplicado
+  Dado que já existe outro Usuario com o email informado
+  Quando tento alterar meu email para o mesmo valor
+  Então recebo um erro 409 Conflict
+  E a mensagem "Email já cadastrado"
 
 Cenário: Tentar alterar CPF
   Dado que estou logado
   Quando tento alterar meu CPF
   Então recebo um erro 400
   E a mensagem "CPF não pode ser alterado"
-
-Cenário: Alterar senha
-  Dado que estou logado com perfil Passageiro
-  Quando altero minha senha informando a senha atual correta
-  Então a senha do Perfil Passageiro é atualizada
-
-Cenário: Alterar senha com senha atual errada
-  Dado que estou logado
-  Quando tento alterar minha senha com a senha atual incorreta
-  Então recebo um erro 401
-  E a mensagem "Senha atual incorreta"
 ```
 
 ### Exemplo
 
-**Requisição:** `PUT /api/auth/perfil/passageiro`
+**Requisição:** `PUT /api/auth/usuario`
 ```json
 {
   "nome": "João Silva Atualizado",
   "email": "joao.novo@email.com",
-  "telefone": "11977777777",
-  "senhaAtual": "SenhaDoJoao123",
-  "novaSenha": "NovaSenha456"
+  "telefone": "11977777777"
 }
 ```
 
@@ -1043,43 +1050,42 @@ Cenário: Alterar senha com senha atual errada
 ```json
 {
   "usuarioId": "u1u2u3u4-...",
-  "perfilId": "p1p2p3p4-...",
   "nome": "João Silva Atualizado",
   "email": "joao.novo@email.com",
   "telefone": "11977777777",
-  "cpf": "12345678909",
-  "tipo": "Passageiro"
+  "cpf": "12345678909"
 }
 ```
 
 ---
 
-## US19 — Atualizar Perfil do Gerente
+## US19 — Atualizar Perfil do Gerente (slug)
 
 **Como** um gerente logado
-**Quero** atualizar meus dados da empresa
+**Quero** atualizar o nome da empresa (slug) do meu perfil gerente
 **Para** manter meu cadastro sempre atualizado
 
-> **Modelo:** O nome fica no **Usuario** (compartilhado entre perfis). Email, telefone, senha e slug ficam no **Perfil Gerente**.
+> **Modelo:** Este endpoint atualiza apenas dados específicos do **Perfil Gerente** (slug). Nome, email e telefone são dados do **Usuario** e devem ser alterados via `PUT /api/auth/usuario` (ver US18). Senha é alterada via `POST /api/auth/alterar-senha` (ver US21).
 
 ### Cenários de Aceitação
 
 ```gherkin
-Cenário: Atualizar nome do Usuario
-  Dado que estou logado com perfil Gerente
-  Quando atualizo meu nome
-  Então o nome é alterado em todos os perfis do Usuario
-
-Cenário: Atualizar email e telefone do Perfil Gerente
-  Dado que estou logado com perfil Gerente
-  Quando atualizo meu email e telefone
-  Então os dados do Perfil Gerente são alterados
-
-Cenário: Tentar alterar slug
+Cenário: Atualizar slug com sucesso
   Dado que estou logado como gerente
-  Quando tento alterar meu slug
+  Quando atualizo meu slug
+  Então o slug do Perfil Gerente é alterado
+
+Cenário: Slug duplicado
+  Dado que já existe outro gerente com o mesmo slug
+  Quando tento alterar para o mesmo slug
+  Então recebo um erro 409 Conflict
+  E a mensagem "Slug já cadastrado"
+
+Cenário: Tentar alterar dados do Usuario pelo endpoint errado
+  Dado que estou logado como gerente
+  Quando envio email ou telefone neste endpoint
   Então recebo um erro 400
-  E a mensagem "Slug não pode ser alterado"
+  E a mensagem "Use PUT /api/auth/usuario para alterar dados do usuário"
 ```
 
 ### Exemplo
@@ -1087,24 +1093,15 @@ Cenário: Tentar alterar slug
 **Requisição:** `PUT /api/auth/perfil/gerente`
 ```json
 {
-  "nome": "Transportadora ABC Atualizada",
-  "email": "contato.novo@transpabc.com",
-  "telefone": "11988888888",
-  "senhaAtual": "MinhaSenha123",
-  "novaSenha": "NovaSenha456"
+  "slug": "transp-abc-novo"
 }
 ```
 
 **Resposta (200):**
 ```json
 {
-  "usuarioId": "u1u2u3u4-...",
   "perfilId": "p1p2p3p4-...",
-  "nome": "Transportadora ABC Atualizada",
-  "slug": "transp-abc",
-  "email": "contato.novo@transpabc.com",
-  "telefone": "11988888888",
-  "ativo": true,
+  "slug": "transp-abc-novo",
   "tipo": "Gerente"
 }
 ```
@@ -1113,11 +1110,11 @@ Cenário: Tentar alterar slug
 
 ## US20 — Desativar Conta (Soft Delete)
 
-**Como** um usuário ou gerente logado
+**Como** um usuário logado
 **Quero** desativar minha conta
 **Para** remover meu acesso à plataforma, podendo reativar depois se quiser
 
-> **Modelo:** Todas as exclusões são **soft delete** (lógicas). O registro permanece no banco com `Ativo = false`. O usuário pode desativar um perfil específico ou todos os seus perfis. A reativação pode ser feita pelo Admin.
+> **Modelo:** Todas as exclusões são **soft delete** (lógicas). O registro permanece no banco com `Ativo = false`. O login é único (Usuario), então desativar o **Usuario** (`Usuario.Ativo = false`) impede qualquer login. É possível também desativar **apenas um perfil específico** (ex: desativar Gerente mas manter Passageiro ativo) — neste caso o Usuario continua podendo fazer login e usar os perfis restantes. A reativação pode ser feita pelo Admin.
 
 ### Cenários de Aceitação
 
@@ -1130,15 +1127,17 @@ Cenário: Solicitar desativação com sucesso
 Cenário: Confirmar desativação com código válido
   Dado que solicitei a desativação e recebi o código
   Quando informo o código correto
-  Então meus perfis são marcados como Ativo = false
+  Então o Usuario é marcado como Ativo = false
+  E todos os seus perfis são marcados como Ativo = false
   E recebo uma confirmação por email
   E não consigo mais fazer login
 
-Cenário: Desativar perfil específico
+Cenário: Desativar apenas um perfil específico
   Dado que tenho múltiplos perfis (Passageiro e Gerente)
   Quando solicito desativar apenas o Perfil Gerente
   Então apenas o Perfil Gerente fica com Ativo = false
-  E ainda posso logar como Passageiro
+  E o Usuario permanece ativo
+  E ainda posso fazer login (login único) e usar o Perfil Passageiro
 
 Cenário: Código inválido
   Dado que solicitei a desativação
@@ -1284,19 +1283,20 @@ Cenário: Nenhum resultado
     "usuarioId": "u1u2u3u4-...",
     "nome": "João Silva",
     "cpf": "12345678909",
+    "email": "joao@email.com",
     "perfis": [
       {
         "perfilId": "p1p2p3p4-...",
         "tipo": "Passageiro",
-        "email": "joao@email.com",
         "ativo": true
       },
       {
         "perfilId": "p5p6p7p8-...",
         "tipo": "Gerente",
-        "email": "contato@transpabc.com",
         "slug": "transp-abc",
-        "ativo": true
+        "ativo": true,
+        "taxaPlataforma": 5.0,
+        "totalViagens": 5
       }
     ],
     "totalReservas": 3,
@@ -1314,11 +1314,11 @@ Cenário: Nenhum resultado
     "usuarioId": "u1u2u3u4-...",
     "nome": "João Silva",
     "cpf": "12345678909",
+    "email": "contato@transpabc.com",
     "perfis": [
       {
         "perfilId": "p5p6p7p8-...",
         "tipo": "Gerente",
-        "email": "contato@transpabc.com",
         "slug": "transp-abc",
         "ativo": true,
         "taxaPlataforma": 5.0,
@@ -1426,7 +1426,7 @@ Cenário: Histórico vazio
 **Quero** cadastrar motoristas no sistema
 **Para** alocá-los nas viagens e controlar minha frota
 
-> **Modelo:** O Motorista é um **Perfil** (Tipo=Motorista) vinculado a um **Usuario**. O sistema busca um Usuario existente pelo CPF informado. Se existir, cria Perfil Motorista para ele. Se não existir, cria um novo Usuario + Perfil Motorista. Motorista **não tem email nem senha** — não faz login.
+> **Modelo:** O Motorista é um **Perfil** (Tipo=Motorista) vinculado a um **Usuario**. O sistema busca um Usuario existente pelo CPF informado. Se existir com `SenhaHash != null`, cria Perfil Motorista para ele (já pode fazer login). Se existir com `SenhaHash = null`, atualiza dados e cria Perfil Motorista. Se não existir, cria um novo Usuario com `Email = null` e `SenhaHash = null` + Perfil Motorista. O Motorista **não tem login inicialmente**, mas pode depois **ativar a conta** registrando-se como Passageiro com o mesmo CPF (US03).
 
 ### Cenários de Aceitação
 
@@ -1666,56 +1666,229 @@ Cenário: Cancelar viagem já concluída
 
 ---
 
-## US27 — Alternar Perfil Ativo
 
-**Como** um usuario com múltiplos perfis
-**Quero** alternar entre meus perfis sem precisar fazer login novamente
-**Para** acessar funcionalidades de diferentes perfis (ex: de Passageiro para Gerente)
+## US28 — Solicitar Ingresso (Passageiro)
+
+**Como** um passageiro com reserva confirmada
+**Quero** solicitar que o gerente compre ingressos para mim
+**Para** ter o ingresso oficial do evento sem precisar comprar fora
+
+> **Pré-requisito:** A reserva deve estar com status "Confirmada" (pagamento do assento já foi processado).
+> **Limite:** O número de ingressos solicitados não pode exceder o número de assentos na reserva.
+> **Face ID:** O passageiro **autoriza** o cadastro do Face ID no VanBora (checkbox 3), mas quem cadastra é o **próprio passageiro no portal do evento**. Após o gerente comprar o ingresso, o portal do evento envia o ingresso por email junto com o link para cadastro do Face ID.
 
 ### Cenários de Aceitação
 
 ```gherkin
-Cenário: Alternar para perfil Gerente
-  Dado que estou logado com perfil Passageiro
-  E que também tenho um Perfil Gerente
-  Quando solicito alternar para meu Perfil Gerente
-  Então recebo um novo JWT com perfil_atual = Gerente
-  E as claims do token refletem o novo perfil
+Cenário: Solicitar ingresso com sucesso
+  Dado que minha reserva está "Confirmada"
+  E a viagem possuiIngresso = true
+  Quando solicito ingresso para o assento 5
+  E autorizo o gerente a comprar
+  E concordo que não há reembolso após receber
+  E autorizo o cadastro do Face ID
+  E informo o email "joao.ingresso@email.com" para receber o ingresso
+  Então o itemReserva fica com statusTicket = "AguardandoPagamento"
+  E possuoIngresso = true
+  E recebo as instruções de pagamento para o gerente
 
-Cenário: Alternar para perfil inexistente
-  Dado que estou logado como Passageiro
-  Quando tento alternar para um perfilId que não me pertence
-  Então recebo um erro 403 Forbidden
-  E a mensagem "Perfil não encontrado ou não pertence ao usuario"
+Cenário: Solicitar ingressos para múltiplos assentos
+  Dado que reservei 3 assentos
+  Quando solicito ingresso para 2 dos 3 assentos
+  Então apenas os 2 itens selecionados têm statusTicket alterado
+  E o terceiro assento permanece como "NaoSolicitado"
 
-Cenário: Token atualizado com novo perfil
-  Dado que estou logado
-  Quando alterno de perfil
-  Então o novo token mantém sub (usuarioId) e nome
-  E altera perfil_atual e perfil_id
-  E as rotas disponíveis mudam conforme o novo perfil
+Cenário: Tentar solicitar mais ingressos que assentos
+  Dado que reservei 2 assentos
+  Quando tento solicitar ingresso para 3 assentos
+  Então recebo um erro 400
+  E a mensagem "Número de ingressos não pode exceder o número de assentos na reserva"
+
+Cenário: Solicitar ingresso sem marcar autorizações
+  Dado que estou na tela de solicitação
+  Quando não marco todos os 3 checkboxes de autorização
+  Então recebo um erro 400
+  E a mensagem "Todos os termos de autorização devem ser aceitos"
+
+Cenário: Solicitar ingresso para reserva não paga
+  Dado que minha reserva está "PendentePagamento"
+  Quando tento solicitar ingresso
+  Então recebo um erro 400
+  E a mensagem "Reserva precisa estar confirmada para solicitar ingressos"
+
+Cenário: Confirmar pagamento ao gerente
+  Dado que solicitei o ingresso e estou com statusTicket = "AguardandoPagamento"
+  Quando pago o gerente via Pix e confirmo no sistema
+  Então o statusTicket muda para "PagoGerente"
+  E o gerente é notificado para comprar o ingresso
+
+Cenário: Cancelar solicitação de ingresso
+  Dado que estou com statusTicket = "AguardandoPagamento"
+  Quando cancelo a solicitação
+  Então o statusTicket volta para "NaoSolicitado"
+  E possuoIngresso = false
 ```
 
 ### Exemplo
 
-**Requisição:** `POST /api/auth/alternar-perfil`
+**Requisição:** `POST /api/reservas/{id}/solicitar-ingressos`
 ```json
 {
-  "perfilId": "p5p6p7p8-..."
+  "itens": [
+    {
+      "itemReservaId": "item1-...",
+      "possuiIngresso": true,
+      "emailParaIngresso": "joao.ingresso@email.com",
+      "autorizadoGerenteCompra": true,
+      "consentimentoSemReembolso": true,
+      "consentimentoFaceId": true
+    }
+  ]
 }
 ```
 
 **Resposta (200):**
 ```json
 {
-  "token": "eyJhbGciOi...",
-  "perfilAtual": "Gerente",
-  "perfilId": "p5p6p7p8-...",
-  "perfisDisponiveis": ["Passageiro", "Gerente"],
-  "usuario": {
-    "id": "u1u2u3u4-...",
-    "nome": "João Silva"
+  "reservaId": "f6a7b8c9-...",
+  "itensAtualizados": [
+    {
+      "itemReservaId": "item1-...",
+      "numeroAssento": 5,
+      "possuiIngresso": true,
+      "statusTicket": "AguardandoPagamento",
+      "precoIngresso": 150.00,
+      "emailParaIngresso": "joao.ingresso@email.com"
+    }
+  ],
+  "mensagem": "Solicitação registrada. Pague o gerente via Pix e confirme o pagamento no sistema.",
+  "pixGerente": "11999999999"
+}
+```
+
+**Requisição:** `POST /api/reservas/{id}/ingressos/{itemReservaId}/confirmar-pagamento`
+
+**Resposta (200):**
+```json
+{
+  "itemReservaId": "item1-...",
+  "statusTicket": "PagoGerente",
+  "mensagem": "Pagamento confirmado. O gerente será notificado para comprar o ingresso."
+}
+```
+
+---
+
+## US29 — Gerente: Gerenciar Solicitações de Ingresso
+
+**Como** um gerente logado
+**Quero** ver as solicitações de ingresso, comprar e acompanhar a entrega dos ingressos
+**Para** atender meus passageiros e garantir que recebam o ingresso do evento
+
+> **Fluxo:** Gerente recebe notificação → Confirma que recebeu o pagamento → Compra ingresso no portal do evento (informando o email do passageiro) → Marca como comprado → Portal do evento envia o ingresso automaticamente por email → Gerente marca como entregue → Passageiro cadastra Face ID no portal do evento (se aplicável)
+
+> **Nota sobre Face ID:** O VanBora apenas registra a autorização do passageiro (checkbox 3). O cadastro do Face ID é feito pelo próprio passageiro no portal do evento, usando o link enviado junto com o ingresso.
+
+### Cenários de Aceitação
+
+```gherkin
+Cenário: Listar solicitações pendentes
+  Dado que estou logado como gerente
+  E que existem passageiros que solicitaram ingressos
+  Quando consulto a lista de solicitações
+  Então vejo todas as solicitações com statusTicket = "PagoGerente"
+  E cada solicitação mostra o passageiro, assento e valor
+
+Cenário: Marcar ingresso como comprado
+  Dado que recebi a solicitação e o pagamento do passageiro
+  Quando compro o ingresso no portal do evento
+  E informo o email do passageiro no portal
+  E marco no sistema como "Comprado"
+  Então o statusTicket muda para "Comprado"
+  E a data de compra é registrada
+
+Cenário: Marcar ingresso como entregue
+  Dado que comprei o ingresso no portal do evento
+  Quando o portal do evento envia o ingresso automaticamente por email
+  E confirmo no sistema como "Entregue"
+  Então o statusTicket muda para "Entregue"
+  E o passageiro recebe uma notificação com o link do portal do evento para cadastro de Face ID (se aplicável)
+
+Cenário: Reembolsar ingresso (caso não consiga comprar)
+  Dado que recebi o pagamento do passageiro
+  Quando não consigo comprar o ingresso no portal do evento
+  E marco como "Reembolsado"
+  Então o statusTicket muda para "Reembolsado"
+  E devo reembolsar o passageiro fora do sistema
+
+Cenário: Prazo de compra expirado
+  Dado que o passageiro pagou há mais de 24 horas
+  E ainda não comprei o ingresso
+  Quando o sistema executa a rotina de verificação
+  Então o sistema me notifica sobre o prazo expirado
+  E o passageiro é notificado para solicitar reembolso
+```
+
+### Exemplo
+
+**Requisição:** `GET /api/gerente/ingressos/solicitacoes`
+
+**Resposta (200):**
+```json
+[
+  {
+    "itemReservaId": "item1-...",
+    "reservaId": "f6a7b8c9-...",
+    "viagemId": "d4e5f6a7-...",
+    "nomeEvento": "Flamengo x Palmeiras - Brasileirão",
+    "numeroAssento": 5,
+    "nomePassageiro": "João Silva",
+    "emailPassageiro": "joao.ingresso@email.com",
+    "precoIngresso": 150.00,
+    "statusTicket": "PagoGerente",
+    "solicitadoEm": "2026-05-06T14:00:00Z",
+    "prazoLimite": "2026-05-07T14:00:00Z"
   }
+]
+```
+
+**Requisição:** `POST /api/gerente/ingressos/{itemReservaId}/comprar`
+
+**Resposta (200):**
+```json
+{
+  "itemReservaId": "item1-...",
+  "statusTicket": "Comprado",
+  "compradoEm": "2026-05-06T15:30:00Z",
+  "mensagem": "Ingresso marcado como comprado. Não se esqueça de enviar por email."
+}
+```
+
+**Requisição:** `POST /api/gerente/ingressos/{itemReservaId}/entregue`
+```json
+{
+  "emailEnviadoPara": "joao.ingresso@email.com"
+}
+```
+
+**Resposta (200):**
+```json
+{
+  "itemReservaId": "item1-...",
+  "statusTicket": "Entregue",
+  "entregueEm": "2026-05-06T15:35:00Z",
+  "mensagem": "Ingresso entregue ao passageiro. Reembolso não disponível."
+}
+```
+
+**Requisição:** `POST /api/gerente/ingressos/{itemReservaId}/reembolsar`
+
+**Resposta (200):**
+```json
+{
+  "itemReservaId": "item1-...",
+  "statusTicket": "Reembolsado",
+  "mensagem": "Ingresso marcado como reembolsado. Lembre-se de devolver o valor ao passageiro."
 }
 ```
 
@@ -1732,4 +1905,4 @@ Cenário: Token atualizado com novo perfil
 | 403 | Forbidden | Conta inativa, sem permissão |
 | 404 | Not Found | Recurso não encontrado |
 | 409 | Conflict | Assento já ocupado, email duplicado, van já alocada |
-| 422 | Unprocessable Entity | Regra de negócio violada (ex: remover van com reservas) |
+| 422 | Unprocessable Entity | Regra de negócio violada (ex: remover van com reservas, prazo de ingresso expirado) |
