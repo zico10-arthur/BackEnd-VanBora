@@ -594,66 +594,300 @@ VanBora.sln
 
 ---
 
-## 7. Plano de Implementação
+## 7. Result Pattern (Tratamento de Erros)
 
-### Fase 1 — Setup e Domain
+> O projeto usará **Result Pattern** como abordagem padrão para tratamento de erros em todas as camadas. Isso substitui o uso de exceções para fluxos esperados (validações, regras de negócio, autorização), reservando exceções apenas para erros inesperados (falha de infraestrutura, bug).
 
-| # | Task | Descrição |
-|---|------|-----------|
-| 1.1 | Configurar projetos | Adicionar referências entre camadas, instalar pacotes NuGet |
-| 1.2 | Criar Value Objects | Email, CPF, Telefone, Placa, Dinheiro (com validações) |
-| 1.3 | Criar Enums | TipoPerfil, StatusViagem, StatusReserva, **StatusTicket** |
-| 1.4 | Criar entidades de domínio | Usuario, Perfil, Van, Viagem, ViagemVan, Reserva, ItemReserva (usando VOs) — ItemReserva inclui campos de ticket |
-| 1.5 | Criar interfaces de repositório | IUsuarioRepository, IPerfilRepository, IVanRepository, IViagemRepository, IViagemVanRepository, IReservaRepository, IItemReservaRepository, IUnitOfWork |
+### 7.1. Estrutura Base
 
-### Fase 2 — Infraestrutura
+```csharp
+public class Result<T>
+{
+    public bool IsSuccess { get; }
+    public bool IsFailure => !IsSuccess;
+    public T Value { get; }
+    public Error Error { get; }
 
-| # | Task | Descrição |
-|---|------|-----------|
-| 2.1 | Configurar DbContext | AppDbContext com DbSets e Fluent API |
-| 2.2 | Criar migrations | Primeira migration para PostgreSQL |
-| 2.3 | Implementar repositórios | Implementar todas as interfaces |
-| 2.4 | Implementar UnitOfWork | Gerenciamento de transações |
+    private Result(T value) { IsSuccess = true; Value = value; Error = null; }
+    private Result(Error error) { IsSuccess = false; Error = error; Value = default; }
 
-### Fase 3 — Application
+    public static Result<T> Success(T value) => new(value);
+    public static Result<T> Failure(Error error) => new(error);
+    public static implicit operator Result<T>(T value) => Success(value);
+    public static implicit operator Result<T>(Error error) => Failure(error);
+}
 
-| # | Task | Descrição |
-|---|------|-----------|
-| 3.1 | Criar DTOs + FluentValidation | Request/Response DTOs e validadores |
-| 3.2 | Implementar AuthService | Registrar (Usuario + Passageiro automático), registrar Gerente (cria ou reutiliza Usuario), login único (email + senha do Usuario), JWT com claims (sub, email, perfis[], nome) |
-| 3.3 | Implementar ViagemService | CRUD de viagens + alocação de vans (inclui campo PrazoCompraIngresso) |
-| 3.4 | Implementar VanService | CRUD de vans |
-| 3.5 | Implementar MotoristaService | CRUD de motoristas (cria Perfil Tipo=Motorista) |
-| 3.6 | Implementar ReservaService | Criar reserva, validar disponibilidade, processar pagamento do assento, enviar emails |
-| 3.7 | Implementar IngressoService | Solicitar ingressos, validar limite (max = assentos), autorizações, confirmar pagamento ao gerente, notificar gerente |
+public class Error
+{
+    public string Code { get; }
+    public string Message { get; }
+    public ErrorType Type { get; }
 
-### Fase 4 — API
+    public Error(string code, string message, ErrorType type = ErrorType.Validation)
+    {
+        Code = code;
+        Message = message;
+        Type = type;
+    }
+}
 
-| # | Task | Descrição |
-|---|------|-----------|
-| 4.1 | AuthController | Endpoints de autenticação (registro, login, alternar perfil) |
-| 4.2 | ViagensController | Endpoints públicos de viagens |
-| 4.3 | ReservasController | CRUD de reservas + solicitar ingressos, confirmar pagamento ao gerente |
-| 4.4 | Gerente/VansController | Gestão de vans |
-| 4.5 | Gerente/MotoristasController | CRUD de motoristas |
-| 4.6 | Gerente/ViagensController | Gestão de viagens + alocação de vans e motoristas |
-| 4.7 | Gerente/IngressosController | Listar solicitações, marcar como comprado, entregue, reembolsar |
-| 4.8 | Admin/GerentesController | Gestão de gerentes |
-| 4.9 | Admin/UsuariosController | Gestão de usuarios (busca, histórico, perfis) |
-| 4.10 | Middleware | Exception handling |
+public enum ErrorType
+{
+    Validation,
+    NotFound,
+    Conflict,
+    Unauthorized,
+    Forbidden,
+    Failure
+}
+```
 
-### Fase 5 — Integrações e Testes
+### 7.2. Como será aplicado por camada
 
-| # | Task | Descrição |
-|---|------|-----------|
-| 5.1 | Integração Pix | Mock inicial do gateway de pagamento |
-| 5.2 | Serviço de Email | Implementar envio de email |
-| 5.3 | Webhook Pagamento | Endpoint para confirmação do gateway |
-| 5.4 | Testes básicos | Testar fluxos principais via Swagger |
+| Camada | Uso |
+|--------|-----|
+| **Domain** | Value Objects retornam `Result<T>` em vez de lançar exceções em validação. Entidades podem usar Result para validar regras de negócio. |
+| **Application** | Services retornam `Result<T>` ou `Result<TResponse>`. Erros de validação, não encontrado, conflito, etc. são expressos via Error. |
+| **Infrastructure** | Repositórios retornam `T?` ou `Result<T>` quando há validação de integridade. |
+| **API** | Middleware converte `Result<T>` automaticamente para respostas HTTP apropriadas (400, 404, 409, etc.) com base no `ErrorType`. |
+
+### 7.3. Exemplo de uso em Application Service
+
+```csharp
+public class ReservaService
+{
+    public async Task<Result<ReservaResponse>> CriarReserva(CriarReservaRequest request)
+    {
+        var viagemVan = await _viagemVanRepo.GetByIdAsync(request.ViagemVanId);
+        if (viagemVan == null)
+            return new Error("VIAGEMVAN_NAO_ENCONTRADA", "Van/Viagem não encontrada", ErrorType.NotFound);
+
+        var assentosOcupados = await _reservaRepo.GetAssentosOcupadosAsync(request.ViagemVanId);
+        var assentosDisponiveis = (viagemVan.Van.Capacidade - 1) - assentosOcupados.Count;
+
+        if (request.Itens.Count > assentosDisponiveis)
+            return new Error("ASSENTOS_INSUFICIENTES", $"Apenas {assentosDisponiveis} assento(s) disponível(is)", ErrorType.Validation);
+
+        // ... fluxo normal
+        return new ReservaResponse { Id = reserva.Id };
+    }
+}
+```
+
+### 7.4. ResultMiddleware — Conversão de Result<T> para HTTP
+
+```csharp
+// Middleware que intercepta Result<T> retornado pelos controllers
+// e converte para respostas REST apropriadas:
+// - Success → 200 OK
+// - ErrorType.Validation → 400 Bad Request
+// - ErrorType.NotFound → 404 Not Found
+// - ErrorType.Conflict → 409 Conflict
+// - ErrorType.Unauthorized → 401 Unauthorized
+// - ErrorType.Forbidden → 403 Forbidden
+// - ErrorType.Failure → 500 Internal Server Error
+```
+
+### 7.5. ExceptionMiddleware — Tratamento de Exceções Inesperadas
+
+```csharp
+// Middleware que captura exceções não tratadas (unhandled exceptions)
+// e retorna 500 Internal Server Error com log do erro.
+// DIFERENÇA: Result pattern = erros de fluxo esperados.
+//             ExceptionMiddleware = erros inesperados (bugs, falha de BD, etc.)
+//
+// Comportamento:
+// - Captura Exception não tratada em qualquer camada
+// - Loga o erro completo (stack trace, inner exception)
+// - Retorna 500 com mensagem genérica (evita vazar detalhes internos)
+// - Em desenvolvimento, pode incluir detalhes do erro na response
+```
+
+### 7.6. Resumo — Result Pattern vs ExceptionMiddleware
+
+| Característica | Result Pattern | ExceptionMiddleware |
+|----------------|---------------|-------------------|
+| **Propósito** | Erros de fluxo esperados | Exceções inesperadas |
+| **Onde ocorre** | Domain/Application Services | Qualquer camada |
+| **Resposta HTTP** | Variável (400, 404, 409, etc.) | 500 Internal Server Error |
+| **Exemplo** | "Email já cadastrado", "Viagem não encontrada" | NullReferenceException, falha de conexão |
+| **Como é ativado** | Retorno explícito de `Result<T>.Failure(erro)` | Lançamento não tratado de `Exception` |
+
+### 7.7. Definições durante a implementação
+
+> Os tipos de erro específicos, nomes dos Error Codes, e a localização exata dos arquivos serão definidos durante a implementação em Code mode, conforme o usuário especificar onde aplicar em cada parte do sistema.
 
 ---
 
-## 8. Considerações sobre Autenticação JWT
+## 8. Plano de Implementação — Scrum (3 Devs, Sprints de 1 semana)
+
+> **Equipe:** 3 integrantes | **Sprint:** 1 semana | **Total estimado:** ~105 story points
+
+---
+
+### Sprint 1 — Fundação + Autenticação
+**Objetivo:** Base do sistema pronta — Domain, Infra, Auth. Ao final, é possível cadastrar e logar como gerente ou passageiro.
+
+**Dependências:** Nenhuma (Sprint inicial)
+**Definition of Done:** Domain entities criadas, Value Objects validados, DbContext configurado, migrations rodando, endpoints de auth respondendo, Result Pattern funcional, JWT emitindo tokens.
+
+| # | US/Task | SP | Responsável | Sub-tasks (arquivos a criar) |
+|---|---------|----|-------------|------------------------------|
+| 1.1 | **Setup técnico** | 5 | **Dev 1** | `Domain/ValueObjects/Email.cs`, `CPF.cs`, `Telefone.cs`, `Placa.cs`, `Dinheiro.cs`; `Domain/Enums/TipoPerfil.cs`, `StatusViagem.cs`, `StatusReserva.cs`, `StatusTicket.cs`; `Domain/Entities/Usuario.cs`, `Perfil.cs`, `Van.cs`, `Viagem.cs`, `ViagemVan.cs`, `Reserva.cs`, `ItemReserva.cs`; `Domain/Interfaces/I*.cs` (todos os repositórios + IUnitOfWork) |
+| 1.2a | **Result Pattern** | 2 | **Dev 1** | `Domain/Common/Result.cs`, `Error.cs`, `ErrorType.cs` |
+| 1.2b | **ResultMiddleware** (conversão Result → HTTP) | 1 | **Dev 1** | `Api/Middleware/ResultMiddleware.cs` |
+| 1.2c | **ExceptionMiddleware** (exceções inesperadas → 500) | 1 | **Dev 1** | `Api/Middleware/ExceptionMiddleware.cs` |
+| 1.3 | **US03 — Cadastro Passageiro** | 8 | **Dev 2** | `Application/DTOs/Auth/RegistrarRequest.cs`, `RegistrarResponse.cs`; `Application/Services/AuthService.cs` (método Registrar); `Application/Validators/RegistrarValidator.cs`; `Infrastructure/Data/AppDbContext.cs`, `Configurations/UsuarioConfiguration.cs`, `PerfilConfiguration.cs`; `Infrastructure/Repositories/UsuarioRepository.cs`, `PerfilRepository.cs`, `UnitOfWork.cs`; `Api/Controllers/AuthController.cs` (POST /api/auth/registrar) |
+| 1.4 | **US01 — Cadastro Gerente** | 8 | **Dev 3** | `Application/DTOs/Auth/RegistrarGerenteRequest.cs`, `RegistrarGerenteResponse.cs`; `Application/Services/AuthService.cs` (método RegistrarGerente); `Application/Validators/RegistrarGerenteValidator.cs`; `Application/Services/AuthService.cs` (método Login); `Api/Controllers/AuthController.cs` (POST /api/auth/gerente/registrar, POST /api/auth/login); `Application/Mappings/AuthProfile.cs` (AutoMapper); `Infrastructure/Extensions/ServiceCollectionExtensions.cs` (DI) |
+| 1.5 | **US02+US04 — Login** | 3 | **Dev 3** | JWT config em `Api/Program.cs`; `Api/appsettings.json` (JWT Secret, expiração) |
+
+> **Sprint Review:** Demo dos endpoints: `POST /api/auth/registrar`, `POST /api/auth/gerente/registrar`, `POST /api/auth/login` — todos funcionando com JWT.
+
+---
+
+### Sprint 2 — Gestão de Vans e Viagens
+**Objetivo:** Gerente pode cadastrar vans, criar viagens, alocar vans, e visualizar viagens publicamente.
+
+**Dependências:** Sprint 1 (precisa de gerente logado para criar vans/viagens)
+**Definition of Done:** CRUD de vans completo, criação de viagem com validações, alocação/desalocação de vans, listagem pública de viagens calculando assentos disponíveis.
+
+| # | US/Task | SP | Responsável | Sub-tasks |
+|---|---------|----|-------------|-----------|
+| 2.1 | **US05 — Cadastrar Van** | 3 | **Dev 1** | `Application/DTOs/Vans/CriarVanRequest.cs`, `VanResponse.cs`; `Application/Services/VanService.cs` (CRUD); `Application/Validators/CriarVanValidator.cs`; `Infrastructure/Repositories/VanRepository.cs`; `Api/Controllers/Gerente/VansController.cs` (GET, POST, PUT, DELETE) |
+| 2.2 | **US17 — Atualizar Van** | 2 | **Dev 1** | Junto com US05 (mesmo VanService + VansController); Regra: capacidade é imutável |
+| 2.3 | **US06 — Criar Viagem** | 5 | **Dev 2** | `Application/DTOs/Viagens/CriarViagemRequest.cs`, `ViagemResponse.cs`; `Application/Services/ViagemService.cs` (CRUD); `Application/Validators/CriarViagemValidator.cs` (valida dataPartida < dataEvento, precoIngresso requires possuiIngresso); `Infrastructure/Repositories/ViagemRepository.cs`; `Api/Controllers/Gerente/ViagensController.cs` (POST) |
+| 2.4 | **US07 — Alocar Van** | 5 | **Dev 2** | `Application/DTOs/Viagens/AlocarVanRequest.cs`; `Application/Services/ViagemService.cs` (método AlocarVan, RemoverVan); `Application/Validators/AlocarVanValidator.cs`; `Infrastructure/Repositories/ViagemVanRepository.cs`; `Api/Controllers/Gerente/ViagensController.cs` (POST alocar-van) |
+| 2.5 | **US08 — Visualizar Viagens** | 5 | **Dev 3** | `Application/DTOs/Viagens/ViagemListaResponse.cs`, `ViagemDetalheResponse.cs`; `Application/Services/ViagemService.cs` (métodos ListarDisponiveis, ObterDetalhes); `Api/Controllers/ViagensController.cs` (GET /api/viagens, GET /api/viagens/{id}) |
+| 2.6 | **US15 — Remover Van** | 3 | **Dev 3** | `Api/Controllers/Gerente/ViagensController.cs` (DELETE remover-van/{viagemVanId}); Lógica de reembolso/cancelamento de reservas |
+| 2.7 | **US16 — Fluxo 0800** | 2 | **Dev 3** | `Application/Services/AuthService.cs` (contador de gerentes ao criar); Lógica: primeiros 2 recebem gratuito=true |
+
+> **Sprint Review:** Demo dos endpoints de van (POST/GET/PUT), viagem (POST), alocar van, visualizar viagens publicamente com assentos disponíveis.
+
+---
+
+### Sprint 3 — Reservas e Pagamento
+**Objetivo:** Fluxo completo de reserva — criar, pagar (Pix mock), cancelar, ver minhas reservas, relatório financeiro.
+
+**Dependências:** Sprint 2 (precisa de viagens com vans alocadas)
+**Definition of Done:** Reserva criada com validação de assentos, Pix mock gerando QR Code, webhook de pagamento, cancelamento liberando assentos, relatório financeiro calculando taxas.
+
+| # | US/Task | SP | Responsável | Sub-tasks |
+|---|---------|----|-------------|-----------|
+| 3.1 | **US09 — Criar Reserva** | 8 | **Dev 1** | `Application/DTOs/Reservas/CriarReservaRequest.cs`, `ReservaResponse.cs`; `Application/Services/ReservaService.cs` (Criar: validar assentos, calcular valor+taxa, gerar Pix, criar itens); `Application/Validators/CriarReservaValidator.cs`; `Infrastructure/Repositories/ReservaRepository.cs`, `ItemReservaRepository.cs`; `Api/Controllers/ReservasController.cs` (POST /api/reservas); Regra: expira em 10min |
+| 3.2 | **US14 — Ver Minhas Reservas** | 2 | **Dev 1** | `Application/DTOs/Reservas/MinhasReservasResponse.cs`; `ReservaService.cs` (ListarMinhas); `Api/Controllers/ReservasController.cs` (GET /api/reservas/minhas, GET /api/reservas/{id}) |
+| 3.3 | **US10 — Pagar Reserva** | 8 | **Dev 2** | `Application/Interfaces/IPagamentoGateway.cs`; `Infrastructure/Services/PagamentoService.cs` (mock — gera QR Code fake); `Application/Services/ReservaService.cs` (GerarPagamento); `Api/Controllers/ReservasController.cs` (POST /api/reservas/{id}/pagar); `Api/Controllers/WebhooksController.cs` (POST /api/webhooks/pix — atualiza status para Confirmada, reduz ingressosDisponiveis, envia email) |
+| 3.4 | **US11 — Cancelar Reserva** | 3 | **Dev 2** | `Application/Services/ReservaService.cs` (Cancelar); `Api/Controllers/ReservasController.cs` (POST /api/reservas/{id}/cancelar); Regra: libera assentos |
+| 3.5 | **US12 — Relatório Financeiro** | 3 | **Dev 3** | `Application/DTOs/Viagens/RelatorioResponse.cs`; `Application/Services/ViagemService.cs` (GerarRelatorio); `Api/Controllers/Gerente/ViagensController.cs` (GET /api/gerente/viagens/{id}/relatorio) |
+| 3.6 | **US18 — Atualizar Usuario** | 2 | **Dev 3** | `Application/DTOs/Auth/AtualizarUsuarioRequest.cs`; `Application/Services/AuthService.cs` (AtualizarUsuario); `Api/Controllers/AuthController.cs` (PUT /api/auth/usuario); Regra: CPF imutável |
+| 3.7 | **Serviço de Email (mock)** | 2 | **Dev 3** | `Application/Interfaces/IEmailService.cs`; `Infrastructure/Services/EmailService.cs` (mock — log no console) |
+
+> **Sprint Review:** Demo do fluxo completo: criar reserva → gerar Pix → simular pagamento (webhook) → ver status confirmada → cancelar → relatório financeiro.
+
+---
+
+### Sprint 4 — Conta, Admin e Motorista
+**Objetivo:** Gestão de conta do usuário, administração do sistema, e cadastro/alocação de motoristas.
+
+**Dependências:** Sprint 1 (precisa de auth), Sprint 3 (precisa de reservas para histórico)
+**Definition of Done:** Alteração de senha, desativação de conta com código email, soft delete de perfil, CRUD admin completo, cadastro de motorista com/sem CPF existente, alocação de motorista em viagem.
+
+| # | US/Task | SP | Responsável | Sub-tasks |
+|---|---------|----|-------------|-----------|
+| 4.1 | **US21 — Alterar Senha** | 2 | **Dev 1** | `Application/DTOs/Auth/AlterarSenhaRequest.cs`; `Application/Services/AuthService.cs` (AlterarSenha); `Api/Controllers/AuthController.cs` (POST /api/auth/alterar-senha) |
+| 4.2 | **US19 — Atualizar Perfil Gerente** | 2 | **Dev 1** | `Application/DTOs/Auth/AtualizarPerfilGerenteRequest.cs`; `Application/Services/AuthService.cs` (AtualizarPerfilGerente); `Api/Controllers/AuthController.cs` (PUT /api/auth/perfil/gerente); Regra: slug único |
+| 4.3 | **US20 — Desativar Conta** | 5 | **Dev 1** | `Application/Services/AuthService.cs` (SolicitarExclusao — gera código, envia email; ConfirmarExclusao — valida código, soft delete); `Api/Controllers/AuthController.cs` (POST /api/auth/solicitar-exclusao, POST /api/auth/confirmar-exclusao); Regra: gerente com reservas ativas não pode desativar |
+| 4.4 | **US13 — Admin: Gerenciar Gerentes** | 5 | **Dev 2** | `Application/DTOs/Admin/GerenteResponse.cs`, `AtualizarGerenteRequest.cs`; `Application/Services/AdminService.cs` (CRUD gerentes); `Api/Controllers/Admin/GerentesController.cs`; Regra: taxa alterada só afeta novas reservas |
+| 4.5 | **US22 — Admin: Buscar Usuarios** | 3 | **Dev 2** | `Application/DTOs/Admin/UsuarioResponse.cs`; `Application/Services/AdminService.cs` (BuscarUsuarios); `Api/Controllers/Admin/UsuariosController.cs` (GET /api/admin/usuarios?search=); GET /api/admin/usuarios/{id}/perfis |
+| 4.6 | **US23 — Admin: Histórico Reservas** | 3 | **Dev 2** | `Application/DTOs/Admin/ReservaHistoricoResponse.cs`; `Application/Services/AdminService.cs` (HistoricoReservasUsuario, HistoricoReservasGerente); `Api/Controllers/Admin/UsuariosController.cs` (GET .../reservas); `Api/Controllers/Admin/GerentesController.cs` (GET .../reservas) |
+| 4.7 | **US24 — Cadastrar Motorista** | 5 | **Dev 3** | `Application/DTOs/Motoristas/CriarMotoristaRequest.cs`, `MotoristaResponse.cs`; `Application/Services/MotoristaService.cs` (CRUD); `Application/Validators/CriarMotoristaValidator.cs`; `Infrastructure/Repositories/PerfilRepository.cs` (já existe); `Api/Controllers/Gerente/MotoristasController.cs`; Regra: busca Usuario por CPF, cria com SenhaHash=null se não existir |
+| 4.8 | **US25 — Alocar Motorista** | 3 | **Dev 3** | `Application/Services/ViagemService.cs` (AlocarMotorista, DesalocarMotorista); `Api/Controllers/Gerente/ViagensController.cs` (POST alocar-motorista); Regra: motorista inativo ou de outro gerente → erro |
+
+> **Sprint Review:** Demo de alterar senha, desativar conta, admin buscando usuarios/gerentes, cadastrar motorista, alocar motorista em viagem.
+
+---
+
+### Sprint 5 — Ingressos + Finalização
+**Objetivo:** Fluxo completo de ingresso (solicitação → pagamento ao gerente → compra → entrega) + testes finais.
+
+**Dependências:** Sprint 3 (precisa de reserva confirmada para solicitar ingresso)
+**Definition of Done:** Passageiro solicita ingresso com 3 checkboxes, confirma pagamento ao gerente, gerente compra/marca entregue/reembolsa, testes integrados passando.
+
+| # | US/Task | SP | Responsável | Sub-tasks |
+|---|---------|----|-------------|-----------|
+| 5.1 | **US28 — Solicitar Ingresso** | 8 | **Dev 1** | `Application/DTOs/Ingressos/SolicitarIngressoRequest.cs`, `SolicitarIngressoResponse.cs`; `Application/Services/IngressoService.cs` (Solicitar — valida reserva Confirmada, checkboxes obrigatórios, max ≤ assentos); `Application/Validators/SolicitarIngressoValidator.cs`; `Api/Controllers/ReservasController.cs` (POST /api/reservas/{id}/solicitar-ingressos); `Api/Controllers/ReservasController.cs` (POST confirmar-pagamento) |
+| 5.2 | **US28 — Confirmar Pagamento ao Gerente** | 2 | **Dev 1** | `Application/Services/IngressoService.cs` (ConfirmarPagamentoGerente); `Api/Controllers/ReservasController.cs` (POST .../confirmar-pagamento); Notifica gerente |
+| 5.3 | **US29 — Listar Solicitações** | 3 | **Dev 2** | `Application/DTOs/Ingressos/SolicitacaoResponse.cs`; `Api/Controllers/Gerente/IngressosController.cs` (GET /api/gerente/ingressos/solicitacoes); `Application/Services/IngressoService.cs` (ListarSolicitacoes) |
+| 5.4 | **US29 — Comprar/Entregar/Reembolsar** | 5 | **Dev 2** | `Application/DTOs/Ingressos/ComprarResponse.cs`, `EntregarResponse.cs`, `ReembolsarResponse.cs`; `Application/Services/IngressoService.cs` (Comprar, Entregar, Reembolsar); `Api/Controllers/Gerente/IngressosController.cs` (POST comprar, POST entregue, POST reembolsar); Regra: prazo de 24h para compra |
+| 5.5 | **US26 — Listar Viagens do Gerente** | 3 | **Dev 3** | `Api/Controllers/Gerente/ViagensController.cs` (GET /api/gerente/viagens — listar com total de reservas); Já parcialmente feito, finalizar nesta Sprint |
+| 5.6 | **Testes Integrados** | 5 | **Dev 3** | Testar fluxos principais via Swagger/Postman: cadastro → login → criar van → criar viagem → alocar van → reservar → pagar → solicitar ingresso → comprar → entregar; Testar cenários de erro (assento ocupado, email duplicado, etc.) |
+
+> **Sprint Review:** Demo completo do fluxo de ingresso + todos os endpoints testados e funcionando.
+
+---
+
+### Mapa de Dependências entre Sprints
+
+```mermaid
+graph LR
+    S1[Sprint 1<br/>Fundação + Auth] --> S2[Sprint 2<br/>Vans + Viagens]
+    S2 --> S3[Sprint 3<br/>Reservas + Pagamento]
+    S1 --> S4[Sprint 4<br/>Conta + Admin + Motorista]
+    S3 --> S5[Sprint 5<br/>Ingressos]
+    S2 --> S5
+    S4 --> S5
+```
+
+---
+
+### Resumo de Story Points por Sprint
+
+| Sprint | SP Total | Dev 1 | Dev 2 | Dev 3 |
+|--------|----------|-------|-------|-------|
+| Sprint 1 — Fundação + Auth | 27 | 8 | 8 | 11 |
+| Sprint 2 — Vans + Viagens | 25 | 5 | 10 | 10 |
+| Sprint 3 — Reservas + Pagamento | 28 | 10 | 11 | 7 |
+| Sprint 4 — Conta + Admin + Motorista | 28 | 9 | 11 | 8 |
+| Sprint 5 — Ingressos + Final | 26 | 10 | 8 | 8 |
+| **Total** | **134** | **42** | **48** | **44** |
+
+> **Nota:** SP (Story Points) são estimativas iniciais. Ajustar durante a Sprint Planning conforme a equipe sentir a velocidade (velocity).
+
+### Product Backlog Priorizado
+
+| Prioridade | US | Descrição | SP | Sprint | Depende de |
+|------------|----|-----------|----|--------|------------|
+| 1 | US03 | Cadastro Passageiro | 8 | Sprint 1 | — |
+| 2 | US01 | Cadastro Gerente | 8 | Sprint 1 | — |
+| 3 | US02 | Login | 3 | Sprint 1 | US01 |
+| 4 | US04 | Login (Passageiro) | 1 | Sprint 1 | US03 |
+| 5 | US05 | Cadastrar Van | 3 | Sprint 2 | US01 |
+| 6 | US17 | Atualizar Van | 2 | Sprint 2 | US05 |
+| 7 | US06 | Criar Viagem | 5 | Sprint 2 | US01 |
+| 8 | US07 | Alocar Van | 5 | Sprint 2 | US05, US06 |
+| 9 | US15 | Remover Van | 3 | Sprint 2 | US07 |
+| 10 | US08 | Visualizar Viagens | 5 | Sprint 2 | US06 |
+| 11 | US16 | Fluxo 0800 | 2 | Sprint 2 | US01 |
+| 12 | US09 | Criar Reserva | 8 | Sprint 3 | US08 |
+| 13 | US14 | Ver Minhas Reservas | 2 | Sprint 3 | US09 |
+| 14 | US10 | Pagar Reserva | 8 | Sprint 3 | US09 |
+| 15 | US11 | Cancelar Reserva | 3 | Sprint 3 | US09 |
+| 16 | US12 | Relatório Financeiro | 3 | Sprint 3 | US09 |
+| 17 | US18 | Atualizar Usuario | 2 | Sprint 3 | US01/US03 |
+| 18 | US21 | Alterar Senha | 2 | Sprint 4 | US01/US03 |
+| 19 | US19 | Atualizar Perfil Gerente | 2 | Sprint 4 | US01 |
+| 20 | US20 | Desativar Conta | 5 | Sprint 4 | US01/US03 |
+| 21 | US13 | Admin: Gerenciar Gerentes | 5 | Sprint 4 | US01 |
+| 22 | US22 | Admin: Buscar Usuarios | 3 | Sprint 4 | US01/US03 |
+| 23 | US23 | Admin: Histórico | 3 | Sprint 4 | US09 |
+| 24 | US24 | Cadastrar Motorista | 5 | Sprint 4 | US01 |
+| 25 | US25 | Alocar Motorista | 3 | Sprint 4 | US24 |
+| 26 | US26 | Listar/Cancelar Viagens | 3 | Sprint 5 | US06 |
+| 27 | US28 | Solicitar Ingresso | 8 | Sprint 5 | US09, US10 |
+| 28 | US29 | Gerenciar Ingressos | 8 | Sprint 5 | US28 |
+
+---
+
+## 9. Considerações sobre Autenticação JWT
 
 O JWT conterá as seguintes claims:
 

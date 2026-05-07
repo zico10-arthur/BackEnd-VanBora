@@ -1,7 +1,7 @@
 # 📋 Relatório Completo — VanBora
 
 > **Data:** 06/05/2026
-> **Documentos de referência:** [`plans/inicial.md`](plans/inicial.md), [`plans/technical-plan.md`](plans/technical-plan.md), [`plans/user-stories.md`](plans/user-stories.md)
+> **Documentos de referência:** [`docs/inicial.md`](docs/inicial.md), [`docs/technical-plan.md`](docs/technical-plan.md), [`docs/user-stories.md`](docs/user-stories.md)
 > **Total de User Stories:** 29 (US01–US29, sem US27)
 
 ---
