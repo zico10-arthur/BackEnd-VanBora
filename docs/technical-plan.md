@@ -123,9 +123,7 @@ erDiagram
 | DataPartida | DateTime | Data/hora de partida |
 | LocalPartida | string | Local de partida |
 | PrecoAssento | decimal | Preço do assento (igual para todas as vans) |
-| PossuiIngresso | bool | Se o gerente oferece opção de ingresso |
-| PrecoIngresso | decimal? | Preço do ingresso (quanto o gerente cobrará do passageiro) |
-| PrazoCompraIngresso | int | Prazo em horas para o gerente comprar o ingresso após solicitação (padrão: 24) |
+| PossuiIngresso | bool | Se a viagem oferece opção de ingresso — quando `true`, o sistema exibe o contato do gerente para o passageiro tratar a compra diretamente |
 | Status | StatusViagem | Agendada, EmAndamento, Concluida, Cancelada |
 | CriadoEm | DateTime | Data de criação |
 
@@ -137,7 +135,6 @@ erDiagram
 | ViagemId | Guid | FK → Viagem |
 | VanId | Guid | FK → Van |
 | MotoristaPerfilId | Guid? | FK → Perfil.Id (Tipo=Motorista, opcional, alocado posteriormente) |
-| IngressosDisponiveis | int | Ingressos que o gerente está disposto a comprar para esta van (limite máximo de solicitações) |
 
 > **Assentos Virtuais:** A capacidade de assentos é derivada diretamente de `Van.Capacidade` (ex: 16 = 15 assentos + motorista). Não existem registros previamente criados de assentos. A disponibilidade é calculada subtraindo os `ItemReserva.NumeroAssento` já registrados para aquela `ViagemVan` do total de assentos disponíveis (`Van.Capacidade - 1`). O usuário escolhe o número do assento no momento da reserva, e o sistema valida se ele já está ocupado por outro `ItemReserva`.
 
@@ -179,22 +176,7 @@ erDiagram
 | EmailPassageiro | string | Email do passageiro |
 | TelefonePassageiro | string | Telefone do passageiro |
 | CPFPassageiro | string | CPF do passageiro |
-| **Campos de Ingresso (preenchidos após pagamento, se solicitado)** |
-| PossuiIngresso | bool | Se o passageiro solicitou ingresso para este assento |
-| PrecoIngresso | decimal? | Preço do ingresso (snapshot no momento da solicitação) |
-| StatusTicket | StatusTicket | NaoSolicitado, AguardandoPagamento, PagoGerente, EmCompra, Comprado, Entregue, Reembolsado |
-| AutorizadoGerenteCompra | bool | Checkbox 1: autoriza gerente a comprar em seu nome |
-| ConsentimentoSemReembolso | bool | Checkbox 2: concorda que não há reembolso após receber |
-| ConsentimentoFaceId | bool | Checkbox 3: autoriza cadastro de Face ID |
-| EmailParaIngresso | string? | Email onde receberá o ingresso (pode ser diferente do email do perfil) |
-| SolicitadoEm | DateTime? | Quando o passageiro solicitou o ingresso |
-| PagoGerenteEm | DateTime? | Quando o passageiro pagou o gerente |
-| CompradoEm | DateTime? | Quando o gerente comprou o ingresso no site do clube |
-| EntregueEm | DateTime? | Quando o gerente enviou o ingresso por email |
-
-> **Nota sobre pagamento:** O pagamento do ingresso é feito **diretamente ao gerente** (fora do VanBora). Os campos `PagoGerenteEm` e `StatusTicket` são atualizados pelo gerente no sistema para registro e rastreamento.
->
-> **Nota sobre Face ID:** O campo `ConsentimentoFaceId` registra apenas a **autorização** do passageiro para cadastro de Face ID. O cadastro em si é feito pelo **próprio passageiro no portal do evento** (site oficial de venda de ingressos), usando o link recebido por email após o gerente comprar o ingresso. O VanBora não cadastra Face ID.
+> **Nota sobre ingresso:** Se a viagem tiver `PossuiIngresso = true`, após o pagamento da reserva o sistema exibe o contato do gerente para o passageiro. Toda a negociação e compra do ingresso é feita diretamente entre passageiro e gerente, fora da plataforma VanBora.
 
 ### 2.3. Value Objects
 
@@ -276,16 +258,6 @@ public enum StatusReserva
     Expirada
 }
 
-public enum StatusTicket
-{
-    NaoSolicitado,
-    AguardandoPagamento,
-    PagoGerente,
-    EmCompra,
-    Comprado,
-    Entregue,
-    Reembolsado
-}
 ```
 
 ---
@@ -365,21 +337,10 @@ public enum StatusTicket
 | GET | `/api/reservas/minhas` | Listar reservas do usuario logado |
 | POST | `/api/reservas/{id}/pagar` | Gerar QR Code Pix para pagamento do assento |
 | POST | `/api/reservas/{id}/cancelar` | Cancelar reserva |
-| POST | `/api/reservas/{id}/solicitar-ingressos` | Solicitar ingressos para itens da reserva (após pagamento do assento) |
-| GET | `/api/reservas/{id}/ingressos` | Status das solicitações de ingresso da reserva |
-| POST | `/api/reservas/{id}/ingressos/{itemReservaId}/confirmar-pagamento` | Passageiro confirma que pagou o gerente pelo ingresso |
 
-### 3.7. Gerente — Gestão de Ingressos
+> **Ingresso:** Se a viagem tiver `PossuiIngresso = true`, após o pagamento da reserva o sistema exibe o contato do gerente (WhatsApp/telefone) para o passageiro tratar a compra do ingresso diretamente. O VanBora não gerencia ingressos.
 
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| GET | `/api/gerente/ingressos/solicitacoes` | Listar solicitações de ingresso pendentes |
-| GET | `/api/gerente/viagens/{viagemId}/ingressos` | Listar solicitações de ingresso de uma viagem |
-| POST | `/api/gerente/ingressos/{itemReservaId}/comprar` | Gerente marca que comprou o ingresso no site do clube |
-| POST | `/api/gerente/ingressos/{itemReservaId}/entregue` | Gerente confirma que enviou o ingresso por email |
-| POST | `/api/gerente/ingressos/{itemReservaId}/reembolsar` | Gerente reembolsa o ingresso (caso não consiga comprar) |
-
-### 3.8. Admin VanBora
+### 3.7. Admin VanBora
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
@@ -403,7 +364,6 @@ sequenceDiagram
     participant API as API
     participant DB as Database
     participant PG as Payment Gateway
-    participant G as Gerente
     
     U->>API: GET /api/viagens
     API->>DB: Buscar viagens disponíveis
@@ -436,33 +396,7 @@ sequenceDiagram
     API->>DB: Atualizar status → Confirmada
     API->>U: Email: reserva confirmada
     
-    Note over U,API: --- FLUXO DO INGRESSO (opcional, separado) ---
-    
-    alt Passageiro opta por solicitar ingresso
-        U->>API: POST /api/reservas/{id}/solicitar-ingressos
-        Note over U,API: Body: itens[{itemReservaId, possuiIngresso, email, checkboxes}]
-        API->>DB: Validar max ingressos ≤ assentos na reserva
-        API->>DB: Atualizar campos de ticket nos ItensReserva
-        API-->>U: Tela de confirmação + resumo dos ingressos solicitados
-        
-        Note over U,G: Passageiro paga o gerente diretamente via Pix
-        
-        U->>API: POST /api/reservas/{id}/ingressos/{itemId}/confirmar-pagamento
-        API->>DB: Atualizar StatusTicket = PagoGerente
-        API-->>G: Notificar: passageiro pagou, comprar ingresso
-        
-        G->>API: POST /api/gerente/ingressos/{itemId}/comprar
-        Note over G: Gerente compra ingresso no site do clube
-        API->>DB: Atualizar StatusTicket = Comprado
-        
-        G->>API: POST /api/gerente/ingressos/{itemId}/entregue
-        Note over G: Gerente envia ingresso por email
-        API->>DB: Atualizar StatusTicket = Entregue
-        API->>U: Email: ingresso recebido
-        
-    else Passageiro não solicita ingresso
-        API->>U: Email: confirmação final (somente assento)
-    end
+    Note over U,API: Se a viagem tiver PossuiIngresso = true, o sistema exibe o contato do gerente para o passageiro tratar o ingresso diretamente.
 ```
 
 ### 4.1. Fluxo de Login Único
@@ -574,9 +508,8 @@ VanBora.sln
 > - **0800:** Primeiros 2 gerentes do sistema recebem gratuito = true automaticamente; Admin pode ajustar taxas individualmente via `PUT /api/admin/gerentes/{id}`
 > - **Reembolso:** Automático via Pix quando gerente cancela viagem ou remove van com reservas
 > - **Capacidade da van:** Imutável após criação, sem exceções
-> - **Ingresso:** VanBora não vende ingressos. A solicitação ocorre após o pagamento do assento. O passageiro autoriza o gerente a comprar, paga diretamente ao gerente, e o gerente compra no site do clube
-> - **Split payment:** Assento → Pix VanBora. Ingresso → Pix Gerente (fora da plataforma)
-> - **Max ingressos:** O passageiro pode solicitar no máximo 1 ingresso por assento reservado
+> - **Ingresso:** VanBora apenas exibe o contato do gerente (WhatsApp/telefone) para o passageiro quando `PossuiIngresso = true`. Toda negociação e compra do ingresso é feita diretamente entre passageiro e gerente, fora da plataforma
+> - **Pagamento:** Apenas o assento é pago via Pix VanBora. Ingresso é tratado externamente
 
 ---
 
@@ -733,7 +666,7 @@ public class ReservaService
 
 | # | US/Task | SP | Responsável | Sub-tasks (arquivos a criar) |
 |---|---------|----|-------------|------------------------------|
-| 1.1 | **Setup técnico** | 5 | **Dev 1** | `Domain/ValueObjects/Email.cs`, `CPF.cs`, `Telefone.cs`, `Placa.cs`, `Dinheiro.cs`; `Domain/Enums/TipoPerfil.cs`, `StatusViagem.cs`, `StatusReserva.cs`, `StatusTicket.cs`; `Domain/Entities/Usuario.cs`, `Perfil.cs`, `Van.cs`, `Viagem.cs`, `ViagemVan.cs`, `Reserva.cs`, `ItemReserva.cs`; `Domain/Interfaces/I*.cs` (todos os repositórios + IUnitOfWork) |
+| 1.1 | **Setup técnico** | 5 | **Dev 1** | `Domain/ValueObjects/Email.cs`, `CPF.cs`, `Telefone.cs`, `Placa.cs`, `Dinheiro.cs`; `Domain/Enums/TipoPerfil.cs`, `StatusViagem.cs`, `StatusReserva.cs`; `Domain/Entities/Usuario.cs`, `Perfil.cs`, `Van.cs`, `Viagem.cs`, `ViagemVan.cs`, `Reserva.cs`, `ItemReserva.cs`; `Domain/Interfaces/I*.cs` (todos os repositórios + IUnitOfWork) |
 | 1.2a | **Result Pattern** | 2 | **Dev 1** | `Domain/Common/Result.cs`, `Error.cs`, `ErrorType.cs` |
 | 1.2b | **ResultMiddleware** (conversão Result → HTTP) | 1 | **Dev 1** | `Api/Middleware/ResultMiddleware.cs` |
 | 1.2c | **ExceptionMiddleware** (exceções inesperadas → 500) | 1 | **Dev 1** | `Api/Middleware/ExceptionMiddleware.cs` |
@@ -755,7 +688,7 @@ public class ReservaService
 |---|---------|----|-------------|-----------|
 | 2.1 | **US05 — Cadastrar Van** | 3 | **Dev 1** | `Application/DTOs/Vans/CriarVanRequest.cs`, `VanResponse.cs`; `Application/Services/VanService.cs` (CRUD); `Application/Validators/CriarVanValidator.cs`; `Infrastructure/Repositories/VanRepository.cs`; `Api/Controllers/Gerente/VansController.cs` (GET, POST, PUT, DELETE) |
 | 2.2 | **US17 — Atualizar Van** | 2 | **Dev 1** | Junto com US05 (mesmo VanService + VansController); Regra: capacidade é imutável |
-| 2.3 | **US06 — Criar Viagem** | 5 | **Dev 2** | `Application/DTOs/Viagens/CriarViagemRequest.cs`, `ViagemResponse.cs`; `Application/Services/ViagemService.cs` (CRUD); `Application/Validators/CriarViagemValidator.cs` (valida dataPartida < dataEvento, precoIngresso requires possuiIngresso); `Infrastructure/Repositories/ViagemRepository.cs`; `Api/Controllers/Gerente/ViagensController.cs` (POST) |
+| 2.3 | **US06 — Criar Viagem** | 5 | **Dev 2** | `Application/DTOs/Viagens/CriarViagemRequest.cs`, `ViagemResponse.cs`; `Application/Services/ViagemService.cs` (CRUD); `Application/Validators/CriarViagemValidator.cs` (valida dataPartida < dataEvento); `Infrastructure/Repositories/ViagemRepository.cs`; `Api/Controllers/Gerente/ViagensController.cs` (POST) |
 | 2.4 | **US07 — Alocar Van** | 5 | **Dev 2** | `Application/DTOs/Viagens/AlocarVanRequest.cs`; `Application/Services/ViagemService.cs` (método AlocarVan, RemoverVan); `Application/Validators/AlocarVanValidator.cs`; `Infrastructure/Repositories/ViagemVanRepository.cs`; `Api/Controllers/Gerente/ViagensController.cs` (POST alocar-van) |
 | 2.5 | **US08 — Visualizar Viagens** | 5 | **Dev 3** | `Application/DTOs/Viagens/ViagemListaResponse.cs`, `ViagemDetalheResponse.cs`; `Application/Services/ViagemService.cs` (métodos ListarDisponiveis, ObterDetalhes); `Api/Controllers/ViagensController.cs` (GET /api/viagens, GET /api/viagens/{id}) |
 | 2.6 | **US15 — Remover Van** | 3 | **Dev 3** | `Api/Controllers/Gerente/ViagensController.cs` (DELETE remover-van/{viagemVanId}); Lógica de reembolso/cancelamento de reservas |
@@ -775,7 +708,7 @@ public class ReservaService
 |---|---------|----|-------------|-----------|
 | 3.1 | **US09 — Criar Reserva** | 8 | **Dev 1** | `Application/DTOs/Reservas/CriarReservaRequest.cs`, `ReservaResponse.cs`; `Application/Services/ReservaService.cs` (Criar: validar assentos, calcular valor+taxa, gerar Pix, criar itens); `Application/Validators/CriarReservaValidator.cs`; `Infrastructure/Repositories/ReservaRepository.cs`, `ItemReservaRepository.cs`; `Api/Controllers/ReservasController.cs` (POST /api/reservas); Regra: expira em 10min |
 | 3.2 | **US14 — Ver Minhas Reservas** | 2 | **Dev 1** | `Application/DTOs/Reservas/MinhasReservasResponse.cs`; `ReservaService.cs` (ListarMinhas); `Api/Controllers/ReservasController.cs` (GET /api/reservas/minhas, GET /api/reservas/{id}) |
-| 3.3 | **US10 — Pagar Reserva** | 8 | **Dev 2** | `Application/Interfaces/IPagamentoGateway.cs`; `Infrastructure/Services/PagamentoService.cs` (mock — gera QR Code fake); `Application/Services/ReservaService.cs` (GerarPagamento); `Api/Controllers/ReservasController.cs` (POST /api/reservas/{id}/pagar); `Api/Controllers/WebhooksController.cs` (POST /api/webhooks/pix — atualiza status para Confirmada, reduz ingressosDisponiveis, envia email) |
+| 3.3 | **US10 — Pagar Reserva** | 8 | **Dev 2** | `Application/Interfaces/IPagamentoGateway.cs`; `Infrastructure/Services/PagamentoService.cs` (mock — gera QR Code fake); `Application/Services/ReservaService.cs` (GerarPagamento); `Api/Controllers/ReservasController.cs` (POST /api/reservas/{id}/pagar); `Api/Controllers/WebhooksController.cs` (POST /api/webhooks/pix — atualiza status para Confirmada, envia email) |
 | 3.4 | **US11 — Cancelar Reserva** | 3 | **Dev 2** | `Application/Services/ReservaService.cs` (Cancelar); `Api/Controllers/ReservasController.cs` (POST /api/reservas/{id}/cancelar); Regra: libera assentos |
 | 3.5 | **US12 — Relatório Financeiro** | 3 | **Dev 3** | `Application/DTOs/Viagens/RelatorioResponse.cs`; `Application/Services/ViagemService.cs` (GerarRelatorio); `Api/Controllers/Gerente/ViagensController.cs` (GET /api/gerente/viagens/{id}/relatorio) |
 | 3.6 | **US18 — Atualizar Usuario** | 2 | **Dev 3** | `Application/DTOs/Auth/AtualizarUsuarioRequest.cs`; `Application/Services/AuthService.cs` (AtualizarUsuario); `Api/Controllers/AuthController.cs` (PUT /api/auth/usuario); Regra: CPF imutável |
@@ -806,22 +739,19 @@ public class ReservaService
 
 ---
 
-### Sprint 5 — Ingressos + Finalização
-**Objetivo:** Fluxo completo de ingresso (solicitação → pagamento ao gerente → compra → entrega) + testes finais.
+### Sprint 5 — Finalização e Testes
+**Objetivo:** Finalizar funcionalidades pendentes, implementar exibição do contato do gerente e testes integrados.
 
-**Dependências:** Sprint 3 (precisa de reserva confirmada para solicitar ingresso)
-**Definition of Done:** Passageiro solicita ingresso com 3 checkboxes, confirma pagamento ao gerente, gerente compra/marca entregue/reembolsa, testes integrados passando.
+**Dependências:** Sprint 3 (precisa de reserva confirmada)
+**Definition of Done:** Exibição do contato do gerente na confirmação da reserva, CRUD de viagens do gerente completo, testes integrados passando.
 
 | # | US/Task | SP | Responsável | Sub-tasks |
 |---|---------|----|-------------|-----------|
-| 5.1 | **US28 — Solicitar Ingresso** | 8 | **Dev 1** | `Application/DTOs/Ingressos/SolicitarIngressoRequest.cs`, `SolicitarIngressoResponse.cs`; `Application/Services/IngressoService.cs` (Solicitar — valida reserva Confirmada, checkboxes obrigatórios, max ≤ assentos); `Application/Validators/SolicitarIngressoValidator.cs`; `Api/Controllers/ReservasController.cs` (POST /api/reservas/{id}/solicitar-ingressos); `Api/Controllers/ReservasController.cs` (POST confirmar-pagamento) |
-| 5.2 | **US28 — Confirmar Pagamento ao Gerente** | 2 | **Dev 1** | `Application/Services/IngressoService.cs` (ConfirmarPagamentoGerente); `Api/Controllers/ReservasController.cs` (POST .../confirmar-pagamento); Notifica gerente |
-| 5.3 | **US29 — Listar Solicitações** | 3 | **Dev 2** | `Application/DTOs/Ingressos/SolicitacaoResponse.cs`; `Api/Controllers/Gerente/IngressosController.cs` (GET /api/gerente/ingressos/solicitacoes); `Application/Services/IngressoService.cs` (ListarSolicitacoes) |
-| 5.4 | **US29 — Comprar/Entregar/Reembolsar** | 5 | **Dev 2** | `Application/DTOs/Ingressos/ComprarResponse.cs`, `EntregarResponse.cs`, `ReembolsarResponse.cs`; `Application/Services/IngressoService.cs` (Comprar, Entregar, Reembolsar); `Api/Controllers/Gerente/IngressosController.cs` (POST comprar, POST entregue, POST reembolsar); Regra: prazo de 24h para compra |
-| 5.5 | **US26 — Listar Viagens do Gerente** | 3 | **Dev 3** | `Api/Controllers/Gerente/ViagensController.cs` (GET /api/gerente/viagens — listar com total de reservas); Já parcialmente feito, finalizar nesta Sprint |
-| 5.6 | **Testes Integrados** | 5 | **Dev 3** | Testar fluxos principais via Swagger/Postman: cadastro → login → criar van → criar viagem → alocar van → reservar → pagar → solicitar ingresso → comprar → entregar; Testar cenários de erro (assento ocupado, email duplicado, etc.) |
+| 5.1 | **Exibir contato do gerente** | 3 | **Dev 1** | `Application/Services/ReservaService.cs` (método ObterContatoGerente — retorna WhatsApp/telefone do gerente quando `PossuiIngresso = true`); `Api/Controllers/ReservasController.cs` (GET /api/reservas/{id}/contato-gerente — retorna dados de contato do gerente) |
+| 5.2 | **US26 — Listar Viagens do Gerente** | 3 | **Dev 2** | `Api/Controllers/Gerente/ViagensController.cs` (GET /api/gerente/viagens — listar com total de reservas) |
+| 5.3 | **Testes Integrados** | 5 | **Dev 3** | Testar fluxos principais via Swagger/Postman: cadastro → login → criar van → criar viagem → alocar van → reservar → pagar → ver contato do gerente; Testar cenários de erro (assento ocupado, email duplicado, etc.) |
 
-> **Sprint Review:** Demo completo do fluxo de ingresso + todos os endpoints testados e funcionando.
+> **Sprint Review:** Demo completo dos fluxos: cadastro → criar van/viagem → reservar → pagar → ver contato do gerente (se possuiIngresso). Todos os endpoints testados.
 
 ---
 
@@ -832,7 +762,7 @@ graph LR
     S1[Sprint 1<br/>Fundação + Auth] --> S2[Sprint 2<br/>Vans + Viagens]
     S2 --> S3[Sprint 3<br/>Reservas + Pagamento]
     S1 --> S4[Sprint 4<br/>Conta + Admin + Motorista]
-    S3 --> S5[Sprint 5<br/>Ingressos]
+    S3 --> S5[Sprint 5<br/>Finalização + Testes]
     S2 --> S5
     S4 --> S5
 ```
@@ -847,8 +777,8 @@ graph LR
 | Sprint 2 — Vans + Viagens | 25 | 5 | 10 | 10 |
 | Sprint 3 — Reservas + Pagamento | 28 | 10 | 11 | 7 |
 | Sprint 4 — Conta + Admin + Motorista | 28 | 9 | 11 | 8 |
-| Sprint 5 — Ingressos + Final | 26 | 10 | 8 | 8 |
-| **Total** | **134** | **42** | **48** | **44** |
+| Sprint 5 — Finalização + Testes | 11 | 3 | 3 | 5 |
+| **Total** | **119** | **35** | **43** | **41** |
 
 > **Nota:** SP (Story Points) são estimativas iniciais. Ajustar durante a Sprint Planning conforme a equipe sentir a velocidade (velocity).
 
@@ -882,8 +812,7 @@ graph LR
 | 24 | US24 | Cadastrar Motorista | 5 | Sprint 4 | US01 |
 | 25 | US25 | Alocar Motorista | 3 | Sprint 4 | US24 |
 | 26 | US26 | Listar/Cancelar Viagens | 3 | Sprint 5 | US06 |
-| 27 | US28 | Solicitar Ingresso | 8 | Sprint 5 | US09, US10 |
-| 28 | US29 | Gerenciar Ingressos | 8 | Sprint 5 | US28 |
+| 27 | — | Exibir contato do gerente | 3 | Sprint 5 | US09, US10 |
 
 ---
 

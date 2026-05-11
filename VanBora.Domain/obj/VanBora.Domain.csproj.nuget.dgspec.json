@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Domain\\VanBora.Domain.csproj": {}
+    "c:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Domain\\VanBora.Domain.csproj": {}
   },
   "projects": {
-    "C:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Domain\\VanBora.Domain.csproj": {
+    "c:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Domain\\VanBora.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Domain\\VanBora.Domain.csproj",
+        "projectUniqueName": "c:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Domain\\VanBora.Domain.csproj",
         "projectName": "VanBora.Domain",
-        "projectPath": "C:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Domain\\VanBora.Domain.csproj",
+        "projectPath": "c:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Domain\\VanBora.Domain.csproj",
         "packagesPath": "C:\\Users\\rezen\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Domain\\obj\\",
+        "outputPath": "c:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Domain\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

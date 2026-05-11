@@ -1,0 +1,16 @@
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\bin\Debug\net9.0\VanBora.Infrastructure.deps.json
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\bin\Debug\net9.0\VanBora.Infrastructure.dll
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\bin\Debug\net9.0\VanBora.Infrastructure.pdb
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\bin\Debug\net9.0\VanBora.Domain.dll
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\bin\Debug\net9.0\VanBora.Domain.pdb
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\obj\Debug\net9.0\VanBora.Infrastructure.csproj.AssemblyReference.cache
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\obj\Debug\net9.0\VanBora.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\obj\Debug\net9.0\VanBora.Infrastructure.AssemblyInfoInputs.cache
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\obj\Debug\net9.0\VanBora.Infrastructure.AssemblyInfo.cs
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\obj\Debug\net9.0\VanBora.Infrastructure.csproj.CoreCompileInputs.cache
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\obj\Debug\net9.0\VanBora.Infrastructure.sourcelink.json
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\obj\Debug\net9.0\VanBora..6E7A12C1.Up2Date
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\obj\Debug\net9.0\VanBora.Infrastructure.dll
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\obj\Debug\net9.0\refint\VanBora.Infrastructure.dll
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\obj\Debug\net9.0\VanBora.Infrastructure.pdb
+c:\Users\rezen\source\repos\BackEnd-VanBora\VanBora.Infrastructure\obj\Debug\net9.0\ref\VanBora.Infrastructure.dll

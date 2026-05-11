@@ -2,7 +2,7 @@
 
 > **Data:** 06/05/2026
 > **Documentos de referência:** [`docs/inicial.md`](docs/inicial.md), [`docs/technical-plan.md`](docs/technical-plan.md), [`docs/user-stories.md`](docs/user-stories.md)
-> **Total de User Stories:** 29 (US01–US29, sem US27)
+> **Total de User Stories:** 27 (US01–US26, sem US27)
 
 ---
 
@@ -14,7 +14,7 @@
     - [Arquitetura](#arquitetura)
   - [2. Modelo de Negócio](#2-modelo-de-negócio)
   - [3. Atores do Sistema (Usuario + Perfil)](#3-atores-do-sistema-usuario--perfil)
-  - [4. Regras de Negócio (30 RNs)](#4-regras-de-negócio-30-rns)
+  - [4. Regras de Negócio (20 RNs)](#4-regras-de-negócio-20-rns)
   - [5. Entidades de Domínio](#5-entidades-de-domínio)
     - [5.1. Usuario (pessoa física)](#51-usuario-pessoa-física)
     - [5.2. Perfil (papel do Usuario)](#52-perfil-papel-do-usuario)
@@ -33,9 +33,8 @@
     - [8.4. Gerente — Motoristas](#84-gerente--motoristas)
     - [8.5. Gerente — Viagens](#85-gerente--viagens)
     - [8.6. Reservas](#86-reservas)
-    - [8.7. Gerente — Ingressos](#87-gerente--ingressos)
-    - [8.8. Admin](#88-admin)
-  - [9. User Stories (29)](#9-user-stories-29)
+    - [8.7. Admin](#87-admin)
+  - [9. User Stories (27)](#9-user-stories-27)
   - [10. Estrutura de Projeto (Clean Architecture)](#10-estrutura-de-projeto-clean-architecture)
   - [11. Plano de Implementação (5 Fases)](#11-plano-de-implementação-5-fases)
     - [Fase 1 — Setup e Domain](#fase-1--setup-e-domain)
@@ -48,14 +47,14 @@
 
 ## 1. Resumo Executivo
 
-O **VanBora** é uma plataforma **SaaS multi-tenant** que conecta passageiros a vans para transporte em eventos (jogos, shows, passeios turísticos). Cada **Gerente** opera independentemente como um inquilino, criando viagens e gerenciando vans. Os usuários reservam assentos, com opção de solicitar que o gerente compre ingressos oficiais dos eventos.
+O **VanBora** é uma plataforma **SaaS multi-tenant** que conecta passageiros a vans para transporte em eventos (jogos, shows, passeios turísticos). Cada **Gerente** opera independentemente como um inquilino, criando viagens e gerenciando vans. Os usuários reservam assentos, com opção de contatar o gerente diretamente para adquirir ingressos quando a viagem oferecer esta possibilidade.
 
 ### Arquitetura
 
 - **Stack:** .NET 9, ASP.NET Core, PostgreSQL, Entity Framework Core
 - **Padrão:** Clean Architecture (4 camadas: Api, Application, Domain, Infrastructure)
 - **Autenticação:** Login único (email + senha do Usuario). JWT com claims (`sub`, `email`, `perfis[]`, `nome`). Operações de gerente usam header `X-Perfil-Id`
-- **Pagamento:** Assento → Pix VanBora (QR Code). Ingresso → Pix direto ao gerente (fora da plataforma)
+- **Pagamento:** Assento → Pix VanBora (QR Code). Ingresso → negociado diretamente entre passageiro e gerente (fora da plataforma)
 - **Modelo de dados:** Usuario (CPF único, Email + SenhaHash) → N Perfis (Passageiro, Gerente, Motorista, Admin)
 
 ---
@@ -68,9 +67,8 @@ O **VanBora** é uma plataforma **SaaS multi-tenant** que conecta passageiros a 
 | 💰 **Receita** | Taxa por reserva (comissão percentual) |
 | 🆓 **Primeiros clientes** | 2 primeiros gerentes cadastrados são gratuitos (taxa = 0) |
 | 👥 **Público** | Qualquer tipo de evento: jogos, shows, passeios turísticos |
-| 📱 **Pagamento assento** | QR Code Pix (processado pelo VanBora) |
-| 💸 **Pagamento ingresso** | Pix direto passageiro → gerente (fora da plataforma) |
-| 🎫 **Ingressos** | VanBora apenas facilita a solicitação. Gerente compra no portal do evento |
+| 📱 **Pagamento** | QR Code Pix (processado pelo VanBora) — apenas o assento |
+| 🎫 **Ingressos** | VanBora exibe o contato do gerente quando `PossuiIngresso = true`. Negociação e compra são feitas fora da plataforma |
 
 ---
 
@@ -105,40 +103,30 @@ O modelo unificado **Usuario + Perfil** é a base do sistema:
 
 ---
 
-## 4. Regras de Negócio (30 RNs)
+## 4. Regras de Negócio (20 RNs)
 
 | # | Regra | Status |
 |---|-------|--------|
 | RN01 | O sistema é **multi-tenant**: cada gerente de van opera independentemente | ✅ |
-| RN02 | O **gerente da van** define os preços do assento e do ingresso, e cria suas próprias viagens | ✅ |
+| RN02 | O **gerente da van** define o preço do assento, indica se a viagem possui ingresso (`PossuiIngresso`), e cria suas próprias viagens | ✅ |
 | RN03 | O VanBora ganha uma **taxa por reserva**. Os **2 primeiros gerentes** cadastrados na plataforma são **gratuitos** (taxa = 0). O Admin pode ajustar a taxa de cada gerente individualmente | ✅ |
 | RN04 | O **usuário precisa ter uma conta** para fazer uma reserva | ✅ |
 | RN05 | O usuário pode reservar **1 ou mais assentos** em uma única reserva | ✅ |
-| RN06 | Cada assento pode ter ou não um **ingresso** associado. A solicitação de ingresso ocorre **após** o pagamento do assento, em fluxo separado | ✅ |
-| RN07 | Em uma mesma reserva, é permitido **misturar** itens com e sem ingresso solicitado | ✅ |
-| RN08 | **Ingresso nunca existe sem uma reserva** — é sempre vinculado a um ItemReserva | ✅ |
-| RN09 | Apenas o **responsável pela reserva** precisa estar logado; os demais passageiros informam **CPF, Nome, Telefone e Email** | ✅ |
-| RN10 | O **passageiro autoriza o gerente** a comprar o ingresso em seu nome. O **gerente compra o ingresso APÓS receber o pagamento do passageiro**, informando o email do passageiro no portal do evento. O **portal do evento envia o ingresso automaticamente** por email | ✅ |
-| RN11 | O pagamento do **assento** é processado via **QR Code Pix** pela plataforma VanBora. O pagamento do **ingresso** é feito **diretamente ao gerente** (fora da plataforma) | ✅ |
-| RN12 | O sistema atende **qualquer tipo de evento** (jogos, shows, passeios turísticos) | ✅ |
-| RN13 | O passageiro **autoriza** o cadastro do Face ID durante a tela de autorização do ingresso (checkbox 3), mas quem cadastra é o **próprio passageiro no portal do evento**. Após o gerente comprar o ingresso, o portal do evento envia o ingresso por email junto com instruções para cadastro do Face ID | ✅ |
-| RN14 | Se a reserva for **somente assento**, o usuário recebe apenas a confirmação da reserva por email | ✅ |
-| RN15 | A **capacidade da van** não pode ser alterada após a criação — é uma característica física fixa do veículo | ✅ |
-| RN16 | O **CPF** é único e imutável. Cada pessoa física tem **um único Usuario** no sistema. Qualquer cadastro (Passageiro, Gerente, Motorista) **reutiliza o Usuario existente** pelo CPF — nunca retorna erro de CPF duplicado. O **Slug do gerente** também é imutável | ✅ |
-| RN17 | A **exclusão de conta** é **soft delete** (desativação lógica). Requer **confirmação por código enviado por email**. O usuário pode desativar o **Usuario** (impede login) ou apenas **perfis específicos** (ex: desativar Gerente mas manter Passageiro ativo) | ✅ |
-| RN18 | O **gerente** pode cadastrar, listar, atualizar e remover **motoristas** vinculados ao seu perfil. A remoção de motorista é **soft delete** (Ativo = false) apenas se ele **não estiver alocado em nenhuma ViagemVan futura**; caso contrário, retorna erro 422 | ✅ |
-| RN19 | O **passageiro tem 10 minutos** para efetuar o pagamento da reserva após criá-la. Após esse prazo, a reserva expira automaticamente e os assentos são liberados | ✅ |
-| RN20 | O **gerente pode cancelar** suas próprias viagens a qualquer momento. Se a viagem tiver **reservas confirmadas**, todas devem ser **reembolsadas integralmente via Pix (automático)** e o status alterado para "Cancelada" | ✅ |
-| RN21 | Ao **remover uma van de uma viagem**, se a van tiver **reservas confirmadas**, todas devem ser **reembolsadas integralmente via Pix (automático)** antes da desalocação | ✅ |
-| RN22 | Um **Usuario** pode ter **múltiplos Perfis** (Passageiro, Gerente, Motorista, Admin) associados ao mesmo CPF | ✅ |
-| RN23 | O **Motorista não possui login inicialmente** — é cadastrado pelo Gerente com `SenhaHash = null`. O Motorista pode depois **ativar a conta** registrando-se como Passageiro com o mesmo CPF (define email e senha), ganhando acesso ao sistema e podendo reservar assentos | ✅ |
-| RN24 | Email é único **no Usuario**. Login é feito com email + senha do Usuario. Diferente do modelo anterior, não existe mais email por Perfil | ✅ |
-| RN25 | A **opção de solicitar ingresso** só aparece **após o pagamento do assento ser confirmado**. Enquanto a reserva estiver "PendentePagamento", a opção não fica disponível | ✅ |
-| RN26 | O **número máximo de ingressos** que o passageiro pode solicitar é igual ao **número de assentos na reserva**. Ex: reservou 4 assentos → pode pedir até 4 ingressos | ✅ |
-| RN27 | A **solicitação de ingresso** exige que o passageiro marque **3 checkboxes** de autorização: autorizar gerente a comprar, concordar com a não-devolução após recebimento, e autorizar cadastro de Face ID | ✅ |
-| RN28 | Após o **ingresso ser recebido por email**, **não há direito ao reembolso** do ingresso. O reembolso do assento permanece normal (via VanBora) | ✅ |
-| RN29 | O **gerente tem 24 horas** (ou prazo definido na viagem) para comprar o ingresso após receber a solicitação + pagamento do passageiro; caso não compre no prazo, o valor do ingresso deve ser **reembolsado ao passageiro** | ✅ |
-| RN30 | O **VanBora não se responsabiliza** pelo ingresso — a transação é entre passageiro e gerente. O VanBora apenas facilita a solicitação, autorização e notificação | ✅ |
+| RN06 | Apenas o **responsável pela reserva** precisa estar logado; os demais passageiros informam **CPF, Nome, Telefone e Email** | ✅ |
+| RN07 | O sistema atende **qualquer tipo de evento** (jogos, shows, passeios turísticos) | ✅ |
+| RN08 | Se a reserva for **somente assento**, o usuário recebe apenas a confirmação da reserva por email | ✅ |
+| RN09 | A **capacidade da van** não pode ser alterada após a criação — é uma característica física fixa do veículo | ✅ |
+| RN10 | O **CPF** é único e imutável. Cada pessoa física tem **um único Usuario** no sistema. Qualquer cadastro (Passageiro, Gerente, Motorista) **reutiliza o Usuario existente** pelo CPF — nunca retorna erro de CPF duplicado. O **Slug do gerente** também é imutável | ✅ |
+| RN11 | A **exclusão de conta** é **soft delete** (desativação lógica). Requer **confirmação por código enviado por email**. O usuário pode desativar o **Usuario** (impede login) ou apenas **perfis específicos** (ex: desativar Gerente mas manter Passageiro ativo) | ✅ |
+| RN12 | O **gerente** pode cadastrar, listar, atualizar e remover **motoristas** vinculados ao seu perfil. A remoção de motorista é **soft delete** (Ativo = false) apenas se ele **não estiver alocado em nenhuma ViagemVan futura**; caso contrário, retorna erro 422 | ✅ |
+| RN13 | O **passageiro tem 10 minutos** para efetuar o pagamento da reserva após criá-la. Após esse prazo, a reserva expira automaticamente e os assentos são liberados | ✅ |
+| RN14 | O **gerente pode cancelar** suas próprias viagens a qualquer momento. Se a viagem tiver **reservas confirmadas**, todas devem ser **reembolsadas integralmente via Pix (automático)** e o status alterado para "Cancelada" | ✅ |
+| RN15 | Ao **remover uma van de uma viagem**, se a van tiver **reservas confirmadas**, todas devem ser **reembolsadas integralmente via Pix (automático)** antes da desalocação | ✅ |
+| RN16 | Um **Usuario** pode ter **múltiplos Perfis** (Passageiro, Gerente, Motorista, Admin) associados ao mesmo CPF | ✅ |
+| RN17 | O **Motorista não possui login inicialmente** — é cadastrado pelo Gerente com `SenhaHash = null`. O Motorista pode depois **ativar a conta** registrando-se como Passageiro com o mesmo CPF (define email e senha), ganhando acesso ao sistema e podendo reservar assentos | ✅ |
+| RN18 | Email é único **no Usuario**. Login é feito com email + senha do Usuario. Diferente do modelo anterior, não existe mais email por Perfil | ✅ |
+| RN19 | Se a viagem tiver `PossuiIngresso = true`, após o pagamento da reserva o sistema exibe o contato do gerente para o passageiro. Toda a negociação e compra do ingresso é feita diretamente entre passageiro e gerente, fora da plataforma VanBora | ✅ |
+| RN20 | O **VanBora não se responsabiliza** pelo ingresso — a transação é entre passageiro e gerente. O sistema apenas exibe o contato do gerente quando aplicável | ✅ |
 
 ---
 
@@ -201,8 +189,6 @@ O modelo unificado **Usuario + Perfil** é a base do sistema:
 | DataEvento, DataPartida | DateTime |
 | PrecoAssento | decimal |
 | PossuiIngresso | bool |
-| PrecoIngresso | decimal? |
-| PrazoCompraIngresso | int (padrão: 24h) |
 | Status | StatusViagem (Agendada, EmAndamento, Concluida, Cancelada) |
 | CriadoEm | DateTime |
 
@@ -214,7 +200,6 @@ O modelo unificado **Usuario + Perfil** é a base do sistema:
 | ViagemId | Guid FK → Viagem |
 | VanId | Guid FK → Van |
 | MotoristaPerfilId | Guid? FK → Perfil (Motorista) |
-| IngressosDisponiveis | int |
 
 > **Assentos Virtuais:** A capacidade é derivada de `Van.Capacidade - 1`. Disponível é calculado subtraindo `ItemReserva.NumeroAssento` já registrados.
 
@@ -249,20 +234,6 @@ O modelo unificado **Usuario + Perfil** é a base do sistema:
 | NumeroAssento | int | Número do assento |
 | PrecoAssento | decimal | Snapshot no momento da reserva |
 | NomePassageiro, EmailPassageiro, TelefonePassageiro, CPFPassageiro | string | Dados do passageiro |
-| **Campos de Ingresso** | | |
-| PossuiIngresso | bool | Se solicitou ingresso |
-| PrecoIngresso | decimal? | Snapshot no momento da solicitação |
-| StatusTicket | StatusTicket | NaoSolicitado, AguardandoPagamento, PagoGerente, EmCompra, Comprado, Entregue, Reembolsado |
-| AutorizadoGerenteCompra | bool | Checkbox 1 |
-| ConsentimentoSemReembolso | bool | Checkbox 2 |
-| ConsentimentoFaceId | bool | Checkbox 3 — apenas autorização. Cadastro é no portal do evento |
-| EmailParaIngresso | string? | Email para receber o ingresso |
-| SolicitadoEm | DateTime? | |
-| PagoGerenteEm | DateTime? | |
-| CompradoEm | DateTime? | |
-| EntregueEm | DateTime? | |
-
-> **Nota:** O pagamento do ingresso é feito **diretamente ao gerente** (fora do VanBora). O campo `ConsentimentoFaceId` registra apenas a **autorização** — o cadastro do Face ID é feito pelo passageiro no portal do evento.
 
 ---
 
@@ -288,7 +259,6 @@ Definidos em `VanBora.Domain/Enums/`:
 public enum TipoPerfil { Passageiro, Gerente, Motorista, Admin }
 public enum StatusViagem { Agendada, EmAndamento, Concluida, Cancelada }
 public enum StatusReserva { PendentePagamento, Confirmada, EmAndamento, Concluida, Cancelada, Expirada }
-public enum StatusTicket { NaoSolicitado, AguardandoPagamento, PagoGerente, EmCompra, Comprado, Entregue, Reembolsado }
 ```
 
 ---
@@ -358,21 +328,10 @@ public enum StatusTicket { NaoSolicitado, AguardandoPagamento, PagoGerente, EmCo
 | `GET` | `/api/reservas/minhas` | US14 — Minhas reservas |
 | `POST` | `/api/reservas/{id}/pagar` | US10 — Pagar assento |
 | `POST` | `/api/reservas/{id}/cancelar` | US11 — Cancelar |
-| `POST` | `/api/reservas/{id}/solicitar-ingressos` | US28 — Solicitar ingressos |
-| `GET` | `/api/reservas/{id}/ingressos` | US28 — Status dos ingressos |
-| `POST` | `/api/reservas/{id}/ingressos/{itemReservaId}/confirmar-pagamento` | US28 — Confirmar pagamento ao gerente |
 
-### 8.7. Gerente — Ingressos
+> **Nota sobre ingresso:** Após o pagamento da reserva ser confirmado, se a viagem tiver `PossuiIngresso = true`, o sistema exibe o contato do gerente para o passageiro tratar a compra diretamente.
 
-| Método | Rota | US |
-|---|---|---|
-| `GET` | `/api/gerente/ingressos/solicitacoes` | US29 — Listar solicitações |
-| `GET` | `/api/gerente/viagens/{viagemId}/ingressos` | US29 — Solicitações da viagem |
-| `POST` | `/api/gerente/ingressos/{itemReservaId}/comprar` | US29 — Marcar como comprado |
-| `POST` | `/api/gerente/ingressos/{itemReservaId}/entregue` | US29 — Marcar como entregue |
-| `POST` | `/api/gerente/ingressos/{itemReservaId}/reembolsar` | US29 — Reembolsar |
-
-### 8.8. Admin
+### 8.7. Admin
 
 | Método | Rota | US |
 |---|---|---|
@@ -386,7 +345,7 @@ public enum StatusTicket { NaoSolicitado, AguardandoPagamento, PagoGerente, EmCo
 
 ---
 
-## 9. User Stories (29)
+## 9. User Stories (27)
 
 | US | Nome | Endpoint Principal |
 |---|---|---|
@@ -417,8 +376,6 @@ public enum StatusTicket { NaoSolicitado, AguardandoPagamento, PagoGerente, EmCo
 | **US25** | Alocar Motorista na Viagem | `POST /api/gerente/viagens/{viagemId}/alocar-motorista/{viagemVanId}` |
 | **US26** | Listar e Cancelar Viagens | `GET/DELETE /api/gerente/viagens` |
 | **~~US27~~** | ~~Alternar Perfil Ativo~~ | ❌ **Removido** — login único, sem alternar perfil |
-| **US28** | Solicitar Ingresso | `POST /api/reservas/{id}/solicitar-ingressos` |
-| **US29** | Gerente: Gerenciar Ingressos | `GET/POST /api/gerente/ingressos/...` |
 
 ---
 
@@ -434,8 +391,7 @@ VanBora.sln
 │   │   ├── Gerente/
 │   │   │   ├── VansController.cs
 │   │   │   ├── MotoristasController.cs
-│   │   │   ├── ViagensController.cs
-│   │   │   └── IngressosController.cs       # 🆕
+│   │   │   └── ViagensController.cs
 │   │   └── Admin/
 │   │       ├── GerentesController.cs
 │   │       └── UsuariosController.cs
@@ -449,15 +405,13 @@ VanBora.sln
 │   │   ├── IViagemService.cs
 │   │   ├── IReservaService.cs
 │   │   ├── IVanService.cs
-│   │   ├── IMotoristaService.cs
-│   │   └── IIngressoService.cs              # 🆕
+│   │   └── IMotoristaService.cs
 │   ├── Services/
 │   │   ├── AuthService.cs
 │   │   ├── ViagemService.cs
 │   │   ├── ReservaService.cs
 │   │   ├── VanService.cs
-│   │   ├── MotoristaService.cs
-│   │   └── IngressoService.cs               # 🆕
+│   │   └── MotoristaService.cs
 │   ├── DTOs/
 │   └── Validators/
 │
@@ -479,8 +433,7 @@ VanBora.sln
 │   ├── Enums/
 │   │   ├── TipoPerfil.cs
 │   │   ├── StatusViagem.cs
-│   │   ├── StatusReserva.cs
-│   │   └── StatusTicket.cs                  # 🆕
+│   │   └── StatusReserva.cs
 │   └── Interfaces/
 │
 ├── VanBora.Infrastructure/
@@ -501,7 +454,7 @@ VanBora.sln
 ### Fase 1 — Setup e Domain
 - [ ] 1.1. Configurar projeto Clean Architecture (Api, Application, Domain, Infrastructure)
 - [ ] 1.2. Implementar Value Objects (Email, CPF, Telefone, Placa, Dinheiro)
-- [ ] 1.3. Implementar Enums (TipoPerfil, StatusViagem, StatusReserva, StatusTicket)
+- [ ] 1.3. Implementar Enums (TipoPerfil, StatusViagem, StatusReserva)
 - [ ] 1.4. Implementar entidades de domínio (Usuario, Perfil, Van, Viagem, ViagemVan, Reserva, ItemReserva)
 
 ### Fase 2 — Infraestrutura
@@ -518,20 +471,17 @@ VanBora.sln
 - [ ] 3.4. Implementar VanService (CRUD)
 - [ ] 3.5. Implementar MotoristaService (CRUD + ativação de conta)
 - [ ] 3.6. Implementar ReservaService (criar, pagar, cancelar)
-- [ ] 3.7. Implementar IngressoService (solicitar, confirmar pagamento, tracking)
-
 ### Fase 4 — API
 - [ ] 4.1. AuthController (registrar, login, me, atualizar, alterar-senha, excluir)
 - [ ] 4.2. ViagensController (público)
-- [ ] 4.3. ReservasController (CRUD + solicitar ingressos + confirmar pagamento)
+- [ ] 4.3. ReservasController (CRUD)
 - [ ] 4.4. Gerente/VansController
 - [ ] 4.5. Gerente/MotoristasController
 - [ ] 4.6. Gerente/ViagensController
-- [ ] 4.7. Gerente/IngressosController
-- [ ] 4.8. Admin/GerentesController + UsuariosController
+- [ ] 4.7. Admin/GerentesController + UsuariosController
 
 ### Fase 5 — Integrações e Testes
 - [ ] 5.1. Integrar webhook de pagamento (gateway Pix)
-- [ ] 5.2. Implementar rotinas automáticas (expirar reservas, notificar prazo de ingresso)
+- [ ] 5.2. Implementar rotinas automáticas (expirar reservas)
 - [ ] 5.3. Implementar soft delete + reembolso automático
 - [ ] 5.4. Testes de integração dos principais fluxos

@@ -303,26 +303,21 @@ Cenário: Capacidade inválida
 ### Cenários de Aceitação
 
 ```gherkin
-Cenário: Criar viagem sem ingresso
+Cenário: Criar viagem
   Dado que estou logado como gerente
   Quando crio uma viagem com preço de assento e possuiIngresso = false
   Então a viagem é criada com status "Agendada"
 
 Cenário: Criar viagem com ingresso
   Dado que estou logado como gerente
-  Quando crio uma viagem com preço de assento e preço de ingresso
-  Então a viagem é criada com possuiIngresso = true
+  Quando crio uma viagem com possuiIngresso = true
+  Então a viagem é criada com status "Agendada"
 
 Cenário: Data da partida após data do evento
   Dado que informo dataPartida maior que dataEvento
   Quando tento criar a viagem
   Então recebo um erro 400
   E a mensagem "Data de partida deve ser anterior à data do evento"
-
-Cenário: Preço de ingresso sem possuiIngresso
-  Dado que informo precoIngresso mas possuiIngresso = false
-  Quando tento criar a viagem
-  Então recebo um erro 400
 ```
 
 ### Exemplo
@@ -336,8 +331,7 @@ Cenário: Preço de ingresso sem possuiIngresso
   "dataPartida": "2026-06-15T17:00:00Z",
   "localPartida": "Praça da Sé - São Paulo",
   "precoAssento": 89.90,
-  "possuiIngresso": true,
-  "precoIngresso": 150.00
+  "possuiIngresso": true
 }
 ```
 
@@ -352,7 +346,6 @@ Cenário: Preço de ingresso sem possuiIngresso
   "localPartida": "Praça da Sé - São Paulo",
   "precoAssento": 89.90,
   "possuiIngresso": true,
-  "precoIngresso": 150.00,
   "status": "Agendada",
   "criadoEm": "2026-05-04T12:00:00Z"
 }
@@ -369,18 +362,6 @@ Cenário: Preço de ingresso sem possuiIngresso
 ### Cenários de Aceitação
 
 ```gherkin
-Cenário: Alocar van com ingressos
-  Dado que a viagem possuiIngresso = true
-  Quando aloco uma van com quantidadeIngressos = 10
-  Então a van é alocada na viagem
-  E ingressosDisponiveis = 10
-
-Cenário: Alocar van sem ingressos
-  Dado que a viagem possuiIngresso = false
-  Quando aloco uma van sem informar ingressos
-  Então a van é alocada na viagem
-  E ingressosDisponiveis = null
-
 Cenário: Van já alocada na mesma viagem
   Dado que a van já está alocada nesta viagem
   Quando tento alocá-la novamente
@@ -397,8 +378,7 @@ Cenário: Viagem já iniciada
 **Requisição:** `POST /api/gerente/viagens/{viagemId}/alocar-van`
 ```json
 {
-  "vanId": "c3d4e5f6-...",
-  "quantidadeIngressos": 10
+  "vanId": "c3d4e5f6-..."
 }
 ```
 
@@ -410,9 +390,7 @@ Cenário: Viagem já iniciada
   "vanId": "c3d4e5f6-...",
   "vanNome": "Van 1 - Mercedes",
   "capacidade": 16,
-  "assentosDisponiveis": 15,
-  "quantidadeIngressos": 10,
-  "ingressosDisponiveis": 10
+  "assentosDisponiveis": 15
 }
 ```
 
@@ -460,7 +438,6 @@ Cenário: Viagem sem vans alocadas
     "localPartida": "Praça da Sé - São Paulo",
     "precoAssento": 89.90,
     "possuiIngresso": true,
-    "precoIngresso": 150.00,
     "gerenteNome": "Transportadora ABC",
     "totalVans": 2,
     "totalAssentosDisponiveis": 30
@@ -481,7 +458,6 @@ Cenário: Viagem sem vans alocadas
   "localPartida": "Praça da Sé - São Paulo",
   "precoAssento": 89.90,
   "possuiIngresso": true,
-  "precoIngresso": 150.00,
   "status": "Agendada",
   "gerente": {
     "id": "a1b2c3d4-...",
@@ -494,7 +470,6 @@ Cenário: Viagem sem vans alocadas
       "vanNome": "Van 1 - Mercedes",
       "capacidade": 16,
       "assentosDisponiveis": 15,
-      "ingressosDisponiveis": 10,
       "assentosLivres": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     }
   ]
@@ -509,7 +484,7 @@ Cenário: Viagem sem vans alocadas
 **Quero** reservar um ou mais assentos em uma viagem
 **Para** garantir meu lugar no evento
 
-> **Nota:** A reserva inicial é **somente para assentos**. O ingresso é solicitado **após** o pagamento do assento ser confirmado, em um fluxo separado (ver US28). **Qualquer usuário logado pode reservar** — independente de ter perfil Passageiro, Gerente ou Admin.
+> **Nota sobre ingresso:** Após o pagamento da reserva ser confirmado, se a viagem tiver `PossuiIngresso = true`, o sistema exibe o contato do gerente para o passageiro tratar a compra do ingresso diretamente. **Qualquer usuário logado pode reservar** — independente de ter perfil Passageiro, Gerente ou Admin.
 
 ### Cenários de Aceitação
 
@@ -592,16 +567,12 @@ Cenário: Reserva expira em 10 minutos
       "id": "item1-...",
       "numeroAssento": 5,
       "precoAssento": 89.90,
-      "possuiIngresso": false,
-      "statusTicket": "NaoSolicitado",
       "nomePassageiro": "João Silva"
     },
     {
       "id": "item2-...",
       "numeroAssento": 6,
       "precoAssento": 89.90,
-      "possuiIngresso": false,
-      "statusTicket": "NaoSolicitado",
       "nomePassageiro": "Maria Souza"
     }
   ]
@@ -616,7 +587,7 @@ Cenário: Reserva expira em 10 minutos
 **Quero** gerar o QR Code Pix e efetuar o pagamento do assento
 **Para** confirmar minha reserva
 
-> **Nota:** Este pagamento cobre **apenas o assento**. O ingresso, se desejado, é pago separadamente em fluxo posterior (ver US28).
+> **Nota:** Este pagamento cobre **apenas o assento**. Após a confirmação, se a viagem tiver `PossuiIngresso = true`, o sistema exibe o contato do gerente para o passageiro.
 
 ### Cenários de Aceitação
 
@@ -630,7 +601,6 @@ Cenário: Webhook de pagamento confirmado
   Dado que o gateway Pix confirma o pagamento
   Quando recebo o webhook
   Então a reserva muda para status "Confirmada"
-  E os ingressosDisponiveis são reduzidos na ViagemVan
   E um email de confirmação é enviado
 
 Cenário: Tentar pagar reserva já confirmada
@@ -857,7 +827,6 @@ Cenário: Reserva com detalhes da viagem
     "itens": [
       {
         "numeroAssento": 5,
-        "possuiIngresso": true,
         "nomePassageiro": "João Silva"
       }
     ],
@@ -1667,232 +1636,6 @@ Cenário: Cancelar viagem já concluída
 ---
 
 
-## US28 — Solicitar Ingresso (Passageiro)
-
-**Como** um passageiro com reserva confirmada
-**Quero** solicitar que o gerente compre ingressos para mim
-**Para** ter o ingresso oficial do evento sem precisar comprar fora
-
-> **Pré-requisito:** A reserva deve estar com status "Confirmada" (pagamento do assento já foi processado).
-> **Limite:** O número de ingressos solicitados não pode exceder o número de assentos na reserva.
-> **Face ID:** O passageiro **autoriza** o cadastro do Face ID no VanBora (checkbox 3), mas quem cadastra é o **próprio passageiro no portal do evento**. Após o gerente comprar o ingresso, o portal do evento envia o ingresso por email junto com o link para cadastro do Face ID.
-
-### Cenários de Aceitação
-
-```gherkin
-Cenário: Solicitar ingresso com sucesso
-  Dado que minha reserva está "Confirmada"
-  E a viagem possuiIngresso = true
-  Quando solicito ingresso para o assento 5
-  E autorizo o gerente a comprar
-  E concordo que não há reembolso após receber
-  E autorizo o cadastro do Face ID
-  E informo o email "joao.ingresso@email.com" para receber o ingresso
-  Então o itemReserva fica com statusTicket = "AguardandoPagamento"
-  E possuoIngresso = true
-  E recebo as instruções de pagamento para o gerente
-
-Cenário: Solicitar ingressos para múltiplos assentos
-  Dado que reservei 3 assentos
-  Quando solicito ingresso para 2 dos 3 assentos
-  Então apenas os 2 itens selecionados têm statusTicket alterado
-  E o terceiro assento permanece como "NaoSolicitado"
-
-Cenário: Tentar solicitar mais ingressos que assentos
-  Dado que reservei 2 assentos
-  Quando tento solicitar ingresso para 3 assentos
-  Então recebo um erro 400
-  E a mensagem "Número de ingressos não pode exceder o número de assentos na reserva"
-
-Cenário: Solicitar ingresso sem marcar autorizações
-  Dado que estou na tela de solicitação
-  Quando não marco todos os 3 checkboxes de autorização
-  Então recebo um erro 400
-  E a mensagem "Todos os termos de autorização devem ser aceitos"
-
-Cenário: Solicitar ingresso para reserva não paga
-  Dado que minha reserva está "PendentePagamento"
-  Quando tento solicitar ingresso
-  Então recebo um erro 400
-  E a mensagem "Reserva precisa estar confirmada para solicitar ingressos"
-
-Cenário: Confirmar pagamento ao gerente
-  Dado que solicitei o ingresso e estou com statusTicket = "AguardandoPagamento"
-  Quando pago o gerente via Pix e confirmo no sistema
-  Então o statusTicket muda para "PagoGerente"
-  E o gerente é notificado para comprar o ingresso
-
-Cenário: Cancelar solicitação de ingresso
-  Dado que estou com statusTicket = "AguardandoPagamento"
-  Quando cancelo a solicitação
-  Então o statusTicket volta para "NaoSolicitado"
-  E possuoIngresso = false
-```
-
-### Exemplo
-
-**Requisição:** `POST /api/reservas/{id}/solicitar-ingressos`
-```json
-{
-  "itens": [
-    {
-      "itemReservaId": "item1-...",
-      "possuiIngresso": true,
-      "emailParaIngresso": "joao.ingresso@email.com",
-      "autorizadoGerenteCompra": true,
-      "consentimentoSemReembolso": true,
-      "consentimentoFaceId": true
-    }
-  ]
-}
-```
-
-**Resposta (200):**
-```json
-{
-  "reservaId": "f6a7b8c9-...",
-  "itensAtualizados": [
-    {
-      "itemReservaId": "item1-...",
-      "numeroAssento": 5,
-      "possuiIngresso": true,
-      "statusTicket": "AguardandoPagamento",
-      "precoIngresso": 150.00,
-      "emailParaIngresso": "joao.ingresso@email.com"
-    }
-  ],
-  "mensagem": "Solicitação registrada. Pague o gerente via Pix e confirme o pagamento no sistema.",
-  "pixGerente": "11999999999"
-}
-```
-
-**Requisição:** `POST /api/reservas/{id}/ingressos/{itemReservaId}/confirmar-pagamento`
-
-**Resposta (200):**
-```json
-{
-  "itemReservaId": "item1-...",
-  "statusTicket": "PagoGerente",
-  "mensagem": "Pagamento confirmado. O gerente será notificado para comprar o ingresso."
-}
-```
-
----
-
-## US29 — Gerente: Gerenciar Solicitações de Ingresso
-
-**Como** um gerente logado
-**Quero** ver as solicitações de ingresso, comprar e acompanhar a entrega dos ingressos
-**Para** atender meus passageiros e garantir que recebam o ingresso do evento
-
-> **Fluxo:** Gerente recebe notificação → Confirma que recebeu o pagamento → Compra ingresso no portal do evento (informando o email do passageiro) → Marca como comprado → Portal do evento envia o ingresso automaticamente por email → Gerente marca como entregue → Passageiro cadastra Face ID no portal do evento (se aplicável)
-
-> **Nota sobre Face ID:** O VanBora apenas registra a autorização do passageiro (checkbox 3). O cadastro do Face ID é feito pelo próprio passageiro no portal do evento, usando o link enviado junto com o ingresso.
-
-### Cenários de Aceitação
-
-```gherkin
-Cenário: Listar solicitações pendentes
-  Dado que estou logado como gerente
-  E que existem passageiros que solicitaram ingressos
-  Quando consulto a lista de solicitações
-  Então vejo todas as solicitações com statusTicket = "PagoGerente"
-  E cada solicitação mostra o passageiro, assento e valor
-
-Cenário: Marcar ingresso como comprado
-  Dado que recebi a solicitação e o pagamento do passageiro
-  Quando compro o ingresso no portal do evento
-  E informo o email do passageiro no portal
-  E marco no sistema como "Comprado"
-  Então o statusTicket muda para "Comprado"
-  E a data de compra é registrada
-
-Cenário: Marcar ingresso como entregue
-  Dado que comprei o ingresso no portal do evento
-  Quando o portal do evento envia o ingresso automaticamente por email
-  E confirmo no sistema como "Entregue"
-  Então o statusTicket muda para "Entregue"
-  E o passageiro recebe uma notificação com o link do portal do evento para cadastro de Face ID (se aplicável)
-
-Cenário: Reembolsar ingresso (caso não consiga comprar)
-  Dado que recebi o pagamento do passageiro
-  Quando não consigo comprar o ingresso no portal do evento
-  E marco como "Reembolsado"
-  Então o statusTicket muda para "Reembolsado"
-  E devo reembolsar o passageiro fora do sistema
-
-Cenário: Prazo de compra expirado
-  Dado que o passageiro pagou há mais de 24 horas
-  E ainda não comprei o ingresso
-  Quando o sistema executa a rotina de verificação
-  Então o sistema me notifica sobre o prazo expirado
-  E o passageiro é notificado para solicitar reembolso
-```
-
-### Exemplo
-
-**Requisição:** `GET /api/gerente/ingressos/solicitacoes`
-
-**Resposta (200):**
-```json
-[
-  {
-    "itemReservaId": "item1-...",
-    "reservaId": "f6a7b8c9-...",
-    "viagemId": "d4e5f6a7-...",
-    "nomeEvento": "Flamengo x Palmeiras - Brasileirão",
-    "numeroAssento": 5,
-    "nomePassageiro": "João Silva",
-    "emailPassageiro": "joao.ingresso@email.com",
-    "precoIngresso": 150.00,
-    "statusTicket": "PagoGerente",
-    "solicitadoEm": "2026-05-06T14:00:00Z",
-    "prazoLimite": "2026-05-07T14:00:00Z"
-  }
-]
-```
-
-**Requisição:** `POST /api/gerente/ingressos/{itemReservaId}/comprar`
-
-**Resposta (200):**
-```json
-{
-  "itemReservaId": "item1-...",
-  "statusTicket": "Comprado",
-  "compradoEm": "2026-05-06T15:30:00Z",
-  "mensagem": "Ingresso marcado como comprado. Não se esqueça de enviar por email."
-}
-```
-
-**Requisição:** `POST /api/gerente/ingressos/{itemReservaId}/entregue`
-```json
-{
-  "emailEnviadoPara": "joao.ingresso@email.com"
-}
-```
-
-**Resposta (200):**
-```json
-{
-  "itemReservaId": "item1-...",
-  "statusTicket": "Entregue",
-  "entregueEm": "2026-05-06T15:35:00Z",
-  "mensagem": "Ingresso entregue ao passageiro. Reembolso não disponível."
-}
-```
-
-**Requisição:** `POST /api/gerente/ingressos/{itemReservaId}/reembolsar`
-
-**Resposta (200):**
-```json
-{
-  "itemReservaId": "item1-...",
-  "statusTicket": "Reembolsado",
-  "mensagem": "Ingresso marcado como reembolsado. Lembre-se de devolver o valor ao passageiro."
-}
-```
-
----
 
 ## Glossário de Respostas HTTP
 
@@ -1905,4 +1648,4 @@ Cenário: Prazo de compra expirado
 | 403 | Forbidden | Conta inativa, sem permissão |
 | 404 | Not Found | Recurso não encontrado |
 | 409 | Conflict | Assento já ocupado, email duplicado, van já alocada |
-| 422 | Unprocessable Entity | Regra de negócio violada (ex: remover van com reservas, prazo de ingresso expirado) |
+| 422 | Unprocessable Entity | Regra de negócio violada (ex: remover van com reservas) |

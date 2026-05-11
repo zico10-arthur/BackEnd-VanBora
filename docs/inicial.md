@@ -2,9 +2,9 @@
 
 ## 1. Visão Geral
 
-O **VanBora** é uma plataforma **SaaS (Software as a Service)** que conecta passageiros a vans para transporte em eventos. O sistema permite que usuários reservem assentos em vans para qualquer tipo de evento (jogos, shows, passeios turísticos), com a opção de solicitar que o gerente compre também o ingresso oficial do evento quando aplicável.
+O **VanBora** é uma plataforma **SaaS (Software as a Service)** que conecta passageiros a vans para transporte em eventos. O sistema permite que usuários reservem assentos em vans para qualquer tipo de evento (jogos, shows, passeios turísticos).
 
-> **Propósito:** Oferecer uma solução completa de transporte + facilitação de ingresso para eventos, onde gerentes de van criam suas viagens e usuários reservam assentos — tudo em um único lugar. **O VanBora não vende ingressos** — apenas facilita a solicitação entre passageiro e gerente.
+> **Propósito:** Oferecer uma solução completa de transporte para eventos, onde gerentes de van criam suas viagens e usuários reservam assentos — tudo em um único lugar. Para viagens com ingresso oficial, o sistema exibe o contato do gerente para que passageiro e gerente tratem a compra diretamente.
 
 ---
 
@@ -59,8 +59,7 @@ Cada viagem está associada a:
 - Um evento (nome, data, local)
 - Data e horário de partida
 - Preço do assento (definido pelo gerente)
-- Quantidade de ingressos oficiais disponíveis (comprados pelo gerente fora do sistema)
-- Preço do ingresso (definido pelo gerente, quando aplicável)
+- Indicador `PossuiIngresso` — se `true`, o sistema exibe o contato do gerente para o passageiro tratar a compra do ingresso diretamente
 
 ### 4.4. Assento
 Unidade individual dentro da van. O usuário pode reservar **um ou mais assentos** por reserva.
@@ -74,74 +73,40 @@ Registro da intenção do usuário de ocupar assentos em uma viagem.
 |----------------|---------|
 | 👤 **Responsável** | Usuário logado que cria a reserva |
 | 🪑 **Múltiplos assentos** | Pode conter 1 ou mais assentos |
-| 🎫 **Ingresso opcional** | Após pagar o assento, o passageiro pode solicitar que o gerente compre o ingresso para ele (separado do pagamento do assento) |
-| 🔀 **Mistura permitida** | Em uma reserva com 3 assentos: 2 solicitam ingresso, 1 não |
 | 👥 **Passageiros** | Apenas o responsável precisa ter conta; os demais passageiros informam: **CPF, Nome, Telefone e Email** |
 
 ### 4.6. Ingresso (Ticket)
 
-Ingresso oficial do evento. **O VanBora não vende ingressos** — o VanBora apenas facilita a solicitação de compra entre o passageiro e o gerente da van.
-
-**Conceito:** O passageiro paga o ingresso **diretamente ao gerente** (via Pix), e o gerente compra o ingresso no **portal do evento** (site oficial de venda de ingressos) informando o email do passageiro no momento da compra. O **portal do evento** envia automaticamente o ingresso por email para o passageiro, junto com instruções para cadastro de Face ID (se aplicável). O **próprio passageiro cadastra o Face ID no portal do evento** — o VanBora não processa o pagamento do ingresso, não cadastra Face ID, nem se responsabiliza por eles.
+Ingresso oficial do evento. **O VanBora não vende ingressos** — o sistema apenas indica se a viagem oferece essa opção (`PossuiIngresso`) e, caso positivo, exibe o contato do gerente para que o passageiro trate a compra diretamente com ele.
 
 **Fluxo do ingresso:**
 
 ```
 Passageiro paga assento (Pix -> VanBora)
   -> Confirmação da reserva
-  -> Opção: "Deseja que o gerente compre o ingresso para você?"
-  -> Se sim: Tela de autorização com 3 checkboxes
-     [1] Autorizo o gerente [nome] a comprar meu ingresso
-     [2] Concordo que após receber o ingresso no email,
-         não terei direito a reembolso (CDC Art. 49)
-     [3] Autorizo o cadastro do meu Face ID para acesso ao evento
-  -> Passageiro informa email para receber o ingresso
-  -> Passageiro paga o valor do ingresso via Pix do gerente
-  -> Gerente recebe a notificação + pagamento
-  -> Gerente compra o ingresso no portal do evento
-     (informa o email do passageiro no portal)
-  -> Portal do evento envia ingresso automaticamente por email
-  -> Passageiro cadastra o próprio Face ID no portal do evento (se aplicável)
-  -> Reembolso do ingresso: indisponível
+  -> PossuiIngresso = true?
+  -> Sistema exibe o contato do gerente
+  -> Passageiro e gerente tratam a compra do ingresso diretamente
+     (fora da plataforma VanBora)
 ```
 
-**Regras importantes:**
-
-| Regra | Descrição |
-|-------|-----------|
-| 🚫 VanBora não vende ingresso | VanBora apenas facilita a solicitação. A transação é entre passageiro e gerente |
-| 🛒 Quem compra | O **gerente da van** compra o ingresso no **portal do evento** (site oficial de venda de ingressos) **em nome do passageiro** |
-| 💰 Pagamento separado | **Assento** → Pix VanBora. **Ingresso** → Pix Gerente (fora da plataforma) |
-| ✅ Autorização obrigatória | Passageiro marca **3 checkboxes** autorizando a compra antes de pagar |
-| 📧 Entrega do ingresso | **Portal do evento** envia o ingresso automaticamente por email para o passageiro assim que o gerente concluir a compra |
-| 🚫 Sem reembolso | Após o ingresso ser recebido por email, **não há direito ao reembolso** (CDC Art. 49 — serviço já prestado / exceção contratual) |
-| 🖥️ Face ID | Passageiro **autoriza** o cadastro no VanBora (checkbox 3). Quem cadastra é o **próprio passageiro no portal do evento**. O portal envia o link de cadastro junto com o ingresso por email |
-| 🏟️ Entrada | No evento, o passageiro passa pelo **Face ID** cadastrado no portal oficial |
-| ⏱️ Prazo para compra | O gerente tem **24 horas** (ou prazo definido) para comprar o ingresso após receber o pagamento do passageiro; caso não compre, o valor é reembolsado |
+> **Nota:** O VanBora não processa pagamento de ingresso, não gerencia prazos de compra, não lida com Face ID, nem se responsabiliza pela transação entre passageiro e gerente. Toda a negociação e compra do ingresso é feita externamente à plataforma.
 
 ### 4.7. Pagamento
 
-O pagamento é **dividido em duas transações independentes**:
-
-1. **Pagamento do assento** — Processado via **QR Code Pix** dentro da plataforma VanBora. Valor integral do assento + taxa da plataforma
-2. **Pagamento do ingresso** — Transferência Pix **direta** do passageiro para o gerente (fora da plataforma VanBora). O VanBora não processa nem retém este valor
+O pagamento cobre **apenas o assento**, processado via **QR Code Pix** dentro da plataforma VanBora (valor integral do assento + taxa da plataforma).
 
 **Fluxo de pagamento:**
 
 ```
 Reserva criada -> QR Code Pix gerado (assento)
   -> Passageiro paga o assento -> Confirmação
-  -> Opção: "Solicitar ingresso?"
-  -> Se sim -> Tela de autorização com 3 checkboxes
-    -> Passageiro informa email
-    -> Passageiro paga ingresso via Pix do gerente
-    -> Gerente compra ingresso no portal do evento
-    -> Portal do evento envia ingresso + link Face ID por email
-    -> Passageiro cadastra Face ID no portal do evento (se aplicável)
-  -> Se não -> Confirmação de reserva enviada por email
+  -> Se viagem possui ingresso (PossuiIngresso = true):
+       Sistema exibe contato do gerente
+  -> Confirmação de reserva enviada por email
 ```
 
-> **Nota importante:** O VanBora **não processa o pagamento do ingresso**. A transação do ingresso é feita diretamente entre passageiro e gerente. O VanBora apenas notifica o gerente sobre a solicitação e o pagamento recebido.
+> **Nota:** O ingresso, se aplicável, é pago diretamente ao gerente (fora da plataforma VanBora). O VanBora não processa nem retém este valor.
 
 ---
 
@@ -182,21 +147,17 @@ flowchart TD
 flowchart TD
     A[Gerente faz login no painel] --> B[Cadastrar vans]
     B --> C[Criar viagem]
-    C --> D[Definir van, data, preço do assento]
-    D --> E{Evento tem ingresso oficial?}
-    E -->|Sim| F[Informar preço do ingresso\nno sistema]
+    C --> D[Definir van, data, preço do assento,\ne possuiIngresso]
+    D --> E{PossuiIngresso?}
+    E -->|Sim| H[Viagem publicada\ncom opção de ingresso]
     E -->|Não| I[Viagem publicada sem ingresso]
-    F --> H[Viagem publicada\ncom opção de ingresso]
     H --> J[Viagem disponível para reservas]
     I --> J
     
     J --> K[Passageiro paga assento]
-    K --> L{Passageiro solicita\ncompra de ingresso?}
-    L -->|Sim| M[Passageiro autoriza + paga]
-    M --> N[Gerente recebe notificação\ne confirma pagamento]
-    N --> O[Gerente compra ingresso\nno portal do evento]
-    O --> P[Portal do evento envia\ningresso por email\nao passageiro]
-    P --> R[Passageiro cadastra\nFace ID no portal\ndo evento se aplicável]
+    K --> L{PossuiIngresso = true?}
+    L -->|Sim| M[Sistema exibe contato\ndo gerente]
+    M --> N[Passageiro trata compra\ndo ingresso diretamente\ncom o gerente]
     L -->|Não| Q[Fluxo concluído]
 ```
 
@@ -214,18 +175,11 @@ flowchart TD
     H --> I{Pagamento\nconfirmado?}
     I -->|Não| J[Reserva expira\nem 10 minutos]
     I -->|Sim| K[Reserva confirmada\nemail de confirmação enviado]
-    K --> L{Evento possui\ningresso oficial?}
+    K --> L{PossuiIngresso = true?}
     L -->|Não| M[Fluxo concluído]
-    L -->|Sim| N[Oferecer opção:\nDeseja que o gerente\ncompre o ingresso?]
-    N -->|Não| M
-    N -->|Sim| O[Tela de Autorização]\n[1] Autorizo gerente comprar\n[2] Sem reembolso após receber\n[3] Autorizo Face ID
-    O --> P[Informar email para\nreceber o ingresso]
-    P --> Q[Passageiro paga ingresso\nvia Pix do gerente]
-    Q --> R[Gerente notificado:\npassageiro pagou + autorizou]
-    R --> S[Gerente compra ingresso\nno portal do evento]
-    S --> T[Portal do evento envia\ningresso por email\nao passageiro]
-    T --> U[Passageiro cadastra\nFace ID no portal\ndo evento se aplicável]
-    U --> V[Reembolso do ingresso:\nINDISPONÍVEL]
+    L -->|Sim| N[Sistema exibe contato\ndo gerente]
+    N --> O[Passageiro trata compra\ndo ingresso diretamente\ncom o gerente]
+    O --> M
 ```
 
 ### 5.4. Diagrama de Estados da Reserva
@@ -249,35 +203,25 @@ stateDiagram-v2
 | # | Regra |
 |---|-------|
 | RN01 | O sistema é **multi-tenant**: cada gerente de van opera independentemente |
-| RN02 | O **gerente da van** define os preços do assento e do ingresso, e cria suas próprias viagens |
+| RN02 | O **gerente da van** define o preço do assento, indica se a viagem possui ingresso (`PossuiIngresso`), e cria suas próprias viagens |
 | RN03 | O VanBora ganha uma **taxa por reserva**. Os **2 primeiros gerentes** cadastrados na plataforma são **gratuitos** (taxa = 0). O Admin pode ajustar a taxa de cada gerente individualmente |
 | RN04 | O **usuário precisa ter uma conta** para fazer uma reserva |
 | RN05 | O usuário pode reservar **1 ou mais assentos** em uma única reserva |
-| RN06 | Cada assento pode ter ou não um **ingresso** associado. A solicitação de ingresso ocorre **após** o pagamento do assento, em fluxo separado |
-| RN07 | Em uma mesma reserva, é permitido **misturar** itens com e sem ingresso solicitado |
-| RN08 | **Ingresso nunca existe sem uma reserva** — é sempre vinculado a um ItemReserva |
-| RN09 | Apenas o **responsável pela reserva** precisa estar logado; os demais passageiros informam **CPF, Nome, Telefone e Email** |
-| RN10 | O **passageiro autoriza o gerente** a comprar o ingresso em seu nome. O **gerente compra o ingresso APÓS receber o pagamento do passageiro**, informando o email do passageiro no portal do evento. O **portal do evento envia o ingresso automaticamente** por email |
-| RN11 | O pagamento do **assento** é processado via **QR Code Pix** pela plataforma VanBora. O pagamento do **ingresso** é feito **diretamente ao gerente** (fora da plataforma) |
-| RN12 | O sistema atende **qualquer tipo de evento** (jogos, shows, passeios turísticos) |
-| RN13 | O passageiro **autoriza** o cadastro do Face ID durante a tela de autorização do ingresso (checkbox 3), mas quem cadastra é o **próprio passageiro no portal do evento**. Após o gerente comprar o ingresso, o portal do evento envia o ingresso por email junto com instruções para cadastro do Face ID |
-| RN14 | Se a reserva for **somente assento**, o usuário recebe apenas a confirmação da reserva por email |
-| RN15 | A **capacidade da van** não pode ser alterada após a criação — é uma característica física fixa do veículo |
-| RN16 | O **CPF** é único e imutável. Cada pessoa física tem **um único Usuario** no sistema. Qualquer cadastro (Passageiro, Gerente, Motorista) **reutiliza o Usuario existente** pelo CPF — nunca retorna erro de CPF duplicado. O **Slug do gerente** também é imutável |
-| RN17 | A **exclusão de conta** é **soft delete** (desativação lógica). Requer **confirmação por código enviado por email**. O usuário pode desativar o **Usuario** (impede login) ou apenas **perfis específicos** (ex: desativar Gerente mas manter Passageiro ativo) |
-| RN18 | O **gerente** pode cadastrar, listar, atualizar e remover **motoristas** vinculados ao seu perfil. A remoção de motorista é **soft delete** (Ativo = false) apenas se ele **não estiver alocado em nenhuma ViagemVan futura**; caso contrário, retorna erro 422 |
-| RN19 | O **passageiro tem 10 minutos** para efetuar o pagamento da reserva após criá-la. Após esse prazo, a reserva expira automaticamente e os assentos são liberados |
-| RN20 | O **gerente pode cancelar** suas próprias viagens a qualquer momento. Se a viagem tiver **reservas confirmadas**, todas devem ser **reembolsadas integralmente via Pix (automático)** e o status alterado para "Cancelada" |
-| RN21 | Ao **remover uma van de uma viagem**, se a van tiver **reservas confirmadas**, todas devem ser **reembolsadas integralmente via Pix (automático)** antes da desalocação |
-| RN22 | Um **Usuario** pode ter **múltiplos Perfis** (Passageiro, Gerente, Motorista, Admin) associados ao mesmo CPF |
-| RN23 | O **Motorista não possui login inicialmente** — é cadastrado pelo Gerente com `SenhaHash = null`. O Motorista pode depois **ativar a conta** registrando-se como Passageiro com o mesmo CPF (define email e senha), ganhando acesso ao sistema e podendo reservar assentos |
-| RN24 | Email é único **no Usuario**. Login é feito com email + senha do Usuario. Diferente do modelo anterior, não existe mais email por Perfil |
-| RN25 | A **opção de solicitar ingresso** só aparece **após o pagamento do assento ser confirmado**. Enquanto a reserva estiver "PendentePagamento", a opção não fica disponível |
-| RN26 | O **número máximo de ingressos** que o passageiro pode solicitar é igual ao **número de assentos na reserva**. Ex: reservou 4 assentos → pode pedir até 4 ingressos |
-| RN27 | A **solicitação de ingresso** exige que o passageiro marque **3 checkboxes** de autorização: autorizar gerente a comprar, concordar com a não-devolução após recebimento, e autorizar cadastro de Face ID |
-| RN28 | Após o **ingresso ser recebido por email**, **não há direito ao reembolso** do ingresso. O reembolso do assento permanece normal (via VanBora) |
-| RN29 | O **gerente tem 24 horas** (ou prazo definido na viagem) para comprar o ingresso após receber a solicitação + pagamento do passageiro; caso não compre no prazo, o valor do ingresso deve ser **reembolsado ao passageiro** |
-| RN30 | O **VanBora não se responsabiliza** pelo ingresso — a transação é entre passageiro e gerente. O VanBora apenas facilita a solicitação, autorização e notificação |
+| RN06 | Apenas o **responsável pela reserva** precisa estar logado; os demais passageiros informam **CPF, Nome, Telefone e Email** |
+| RN07 | O sistema atende **qualquer tipo de evento** (jogos, shows, passeios turísticos) |
+| RN08 | Se a reserva for **somente assento**, o usuário recebe apenas a confirmação da reserva por email |
+| RN09 | A **capacidade da van** não pode ser alterada após a criação — é uma característica física fixa do veículo |
+| RN10 | O **CPF** é único e imutável. Cada pessoa física tem **um único Usuario** no sistema. Qualquer cadastro (Passageiro, Gerente, Motorista) **reutiliza o Usuario existente** pelo CPF — nunca retorna erro de CPF duplicado. O **Slug do gerente** também é imutável |
+| RN11 | A **exclusão de conta** é **soft delete** (desativação lógica). Requer **confirmação por código enviado por email**. O usuário pode desativar o **Usuario** (impede login) ou apenas **perfis específicos** (ex: desativar Gerente mas manter Passageiro ativo) |
+| RN12 | O **gerente** pode cadastrar, listar, atualizar e remover **motoristas** vinculados ao seu perfil. A remoção de motorista é **soft delete** (Ativo = false) apenas se ele **não estiver alocado em nenhuma ViagemVan futura**; caso contrário, retorna erro 422 |
+| RN13 | O **passageiro tem 10 minutos** para efetuar o pagamento da reserva após criá-la. Após esse prazo, a reserva expira automaticamente e os assentos são liberados |
+| RN14 | O **gerente pode cancelar** suas próprias viagens a qualquer momento. Se a viagem tiver **reservas confirmadas**, todas devem ser **reembolsadas integralmente via Pix (automático)** e o status alterado para "Cancelada" |
+| RN15 | Ao **remover uma van de uma viagem**, se a van tiver **reservas confirmadas**, todas devem ser **reembolsadas integralmente via Pix (automático)** antes da desalocação |
+| RN16 | Um **Usuario** pode ter **múltiplos Perfis** (Passageiro, Gerente, Motorista, Admin) associados ao mesmo CPF |
+| RN17 | O **Motorista não possui login inicialmente** — é cadastrado pelo Gerente com `SenhaHash = null`. O Motorista pode depois **ativar a conta** registrando-se como Passageiro com o mesmo CPF (define email e senha), ganhando acesso ao sistema e podendo reservar assentos |
+| RN18 | Email é único **no Usuario**. Login é feito com email + senha do Usuario. Diferente do modelo anterior, não existe mais email por Perfil |
+| RN19 | Se a viagem tiver `PossuiIngresso = true`, após o pagamento da reserva o sistema exibe o contato do gerente para o passageiro. Toda a negociação e compra do ingresso é feita diretamente entre passageiro e gerente, fora da plataforma VanBora |
+| RN20 | O **VanBora não se responsabiliza** pelo ingresso — a transação é entre passageiro e gerente. O sistema apenas exibe o contato do gerente quando aplicável |
 
 ---
 
@@ -305,7 +249,6 @@ stateDiagram-v2
 | **Perfil** | Papel que um Usuario pode ter (Passageiro, Gerente, Motorista, Admin) |
 | **Passageiro** | Perfil de usuário final que reserva assentos |
 | **0800** | Gratuito, sem custo |
-| **Face ID** | Autenticação biométrica para acesso ao estádio/evento |
 | **QR Code** | Código para pagamento via Pix |
 
 ---
