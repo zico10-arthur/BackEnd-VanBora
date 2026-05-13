@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("VanBora.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ba58bed48fe8e0686a5a6ca01c4d13bc4d187d5a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c31a3bf4e3ae30d16f5d809ff04128b1f0e4bda6")]
 [assembly: System.Reflection.AssemblyProductAttribute("VanBora.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("VanBora.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

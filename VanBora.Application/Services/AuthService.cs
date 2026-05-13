@@ -3,6 +3,7 @@ using VanBora.Application.DTOs.Auth;
 using VanBora.Application.Interfaces;
 using VanBora.Domain.Common;
 using VanBora.Domain.Entities;
+using VanBora.Domain.Enums;
 using VanBora.Domain.Interfaces;
 using VanBora.Domain.ValueObjects;
 
@@ -33,142 +34,203 @@ public class AuthService : IAuthService
         _loginValidator = loginValidator;
     }
 
+    // ════════════════════════════════════════════════════════════════
+    //  ORQUESTRAÇÃO — Registrar Gerente
+    // ════════════════════════════════════════════════════════════════
     public async Task<Result<RegistrarGerenteResponse>> RegistrarGerente(
         RegistrarGerenteRequest request,
         CancellationToken cancellationToken = default)
     {
-        // ────────────────────────────────────────────────────────────
-        // PASSO 1: Validar dados de entrada (FluentValidation)
-        // ────────────────────────────────────────────────────────────
-        var validationResult = await _registrarGerenteValidator.ValidateAsync(request, cancellationToken);
+        // 1. Validar request (FluentValidation)
+        var erroValidacao = await ValidarRegistroAsync(request, cancellationToken);
+        if (erroValidacao is not null) return erroValidacao;
 
-        if (!validationResult.IsValid)
-        {
-            var erros = string.Join(" | ", validationResult.Errors.Select(e => e.ErrorMessage));
-            return Error.Validation("DADOS_INVALIDOS", erros);
-        }
+        // 2. Extrair e validar Value Objects do request
+        var valueObjects = ExtrairValueObjects(request);
+        if (valueObjects.IsFailure) return valueObjects.Error;
+        var (cpf, email, telefone) = valueObjects.Value;
 
-        // ────────────────────────────────────────────────────────────
-        // PASSO 2: Criar Value Objects
-        // ────────────────────────────────────────────────────────────
-        var cpfResult = CPF.Criar(request.Cpf);
-        if (cpfResult.IsFailure)
-            return cpfResult.Error;
+        // 3. Verificar slug único
+        var slug = NormalizarSlug(request.Slug);
+        if (await SlugJaEmUsoAsync(slug, cancellationToken))
+            return Error.Conflict("SLUG_DUPLICADO", "Slug já cadastrado.");
 
+        // 4. Obter usuário (criar novo ou reutilizar existente via RN10)
+        var usuarioResult = await ObterUsuarioAsync(cpf, email, request.Nome, request.Senha, telefone, cancellationToken);
+        if (usuarioResult.IsFailure) return usuarioResult.Error;
+        var usuario = usuarioResult.Value;
+
+        // 5. Calcular taxa (Fluxo 0800 — gratuito para < 2 gerentes)
+        var (gratuito, taxa) = await CalcularTaxaAsync(cancellationToken);
+
+        // 6. Criar Perfil Gerente + persistir transação
+        var perfilGerente = CriarPerfilGerente(usuario, slug, gratuito, taxa);
+        await _perfilRepo.AddAsync(perfilGerente, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // 7. Montar resposta com token JWT
+        return CriarResposta(usuario, perfilGerente, email);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  ORQUESTRAÇÃO — Login
+    // ════════════════════════════════════════════════════════════════
+    public async Task<Result<LoginResponse>> Login(
+        LoginRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Validar request
+        var (valido, erro) = await ValidarLoginAsync(request, cancellationToken);
+        if (!valido) return erro!;
+
+        // 2. Criar Value Object Email
         var emailResult = Email.Criar(request.Email);
         if (emailResult.IsFailure)
-            return emailResult.Error;
+            return Error.Validation("EMAIL_INVALIDO", "Formato de email inválido");
+        var email = emailResult.Value;
+
+        // 3. Buscar usuário por email
+        var usuario = await _usuarioRepo.GetByEmailAsync(email, cancellationToken);
+        if (usuario is null)
+            return Error.Unauthorized("CREDENCIAIS_INVALIDAS", "Email ou senha inválidos");
+
+        // 4. Verificar estado da conta
+        var erroEstado = VerificarEstadoConta(usuario);
+        if (erroEstado is not null) return erroEstado;
+
+        // 5. Verificar senha
+        if (!BCrypt.Net.BCrypt.Verify(request.Senha, usuario.SenhaHash))
+            return Error.Unauthorized("CREDENCIAIS_INVALIDAS", "Email ou senha inválidos");
+
+        // 6. Buscar perfis ativos
+        var perfisAtivos = await BuscarPerfisAtivosAsync(usuario.Id, cancellationToken);
+
+        // 7. Gerar token + resposta
+        return CriarRespostaLogin(usuario, perfisAtivos);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  MÉTODOS PRIVADOS — Registrar Gerente
+    // ════════════════════════════════════════════════════════════════
+
+    private async Task<Error?> ValidarRegistroAsync(RegistrarGerenteRequest request, CancellationToken ct)
+    {
+        var result = await _registrarGerenteValidator.ValidateAsync(request, ct);
+        if (result.IsValid) return null;
+
+        var erros = string.Join(" | ", result.Errors.Select(e => e.ErrorMessage));
+        return Error.Validation("DADOS_INVALIDOS", erros);
+    }
+
+    private static Result<(CPF cpf, Email email, Telefone? telefone)> ExtrairValueObjects(RegistrarGerenteRequest request)
+    {
+        var cpfResult = CPF.Criar(request.Cpf);
+        if (cpfResult.IsFailure) return cpfResult.Error;
+
+        var emailResult = Email.Criar(request.Email);
+        if (emailResult.IsFailure) return emailResult.Error;
 
         Telefone? telefone = null;
         if (!string.IsNullOrWhiteSpace(request.Telefone))
         {
             var telefoneResult = Telefone.Criar(request.Telefone);
-            if (telefoneResult.IsFailure)
-                return telefoneResult.Error;
-
+            if (telefoneResult.IsFailure) return telefoneResult.Error;
             telefone = telefoneResult.Value;
         }
 
-        // ────────────────────────────────────────────────────────────
-        // PASSO 3: Verificar slug único
-        // ────────────────────────────────────────────────────────────
-        var slugNormalized = request.Slug.Trim().ToLowerInvariant();
-        var perfilExistenteSlug = await _perfilRepo.GetBySlugAsync(slugNormalized, cancellationToken);
-        if (perfilExistenteSlug is not null)
-            return Error.Conflict("SLUG_DUPLICADO", "Slug já cadastrado.");
+        return Result<(CPF, Email, Telefone?)>.Success((cpfResult.Value, emailResult.Value, telefone));
+    }
 
-        // ────────────────────────────────────────────────────────────
-        // PASSO 4: Buscar ou criar Usuario por CPF (RN10)
-        // ────────────────────────────────────────────────────────────
-        Usuario usuario;
-        var usuarioExistente = await _usuarioRepo.GetByCpfAsync(cpfResult.Value, cancellationToken);
+    private static string NormalizarSlug(string slug)
+        => slug.Trim().ToLowerInvariant();
 
-        if (usuarioExistente is null)
+    private async Task<bool> SlugJaEmUsoAsync(string slug, CancellationToken ct)
+    {
+        var existente = await _perfilRepo.GetBySlugAsync(slug, ct);
+        return existente is not null;
+    }
+
+    private async Task<Result<Usuario>> ObterUsuarioAsync(
+        CPF cpf, Email email, string nome, string senha, Telefone? telefone,
+        CancellationToken ct)
+    {
+        var existente = await _usuarioRepo.GetByCpfAsync(cpf, ct);
+
+        if (existente is null)
+            return await CriarUsuarioComPerfilPassageiroAsync(nome, cpf, email, senha, telefone, ct);
+
+        return await ValidarEAtualizarUsuarioExistenteAsync(existente, email, nome, senha, telefone, ct);
+    }
+
+    private async Task<Result<Usuario>> CriarUsuarioComPerfilPassageiroAsync(
+        string nome, CPF cpf, Email email, string senha, Telefone? telefone,
+        CancellationToken ct)
+    {
+        var emailExistente = await _usuarioRepo.GetByEmailAsync(email, ct);
+        if (emailExistente is not null)
+            return Error.Conflict("EMAIL_DUPLICADO", "Email já cadastrado.");
+
+        var senhaHash = BCrypt.Net.BCrypt.HashPassword(senha);
+        var usuario = new Usuario(nome, cpf, email, senhaHash, telefone);
+
+        await _usuarioRepo.AddAsync(usuario, ct);
+
+        var perfilPassageiro = Perfil.CriarPassageiro(usuario.Id);
+        usuario.AdicionarPerfil(perfilPassageiro);
+        await _perfilRepo.AddAsync(perfilPassageiro, ct);
+
+        return Result<Usuario>.Success(usuario);
+    }
+
+    private async Task<Result<Usuario>> ValidarEAtualizarUsuarioExistenteAsync(
+        Usuario usuario, Email email, string nome, string senha, Telefone? telefone,
+        CancellationToken ct)
+    {
+        if (usuario.Perfis.Any(p => p.Tipo == TipoPerfil.Gerente))
+            return Error.Conflict("GERENTE_EXISTENTE", "Usuário já possui perfil de gerente.");
+
+        // Usuário sem email (ex-Motorista): precisa configurar dados completos
+        if (usuario.Email is null)
         {
-            // ── CPF não existe → criar novo Usuario ──
-            var emailExistente = await _usuarioRepo.GetByEmailAsync(emailResult.Value, cancellationToken);
-            if (emailExistente is not null)
+            var emailDeOutro = await _usuarioRepo.GetByEmailAsync(email, ct);
+            if (emailDeOutro is not null && emailDeOutro.Id != usuario.Id)
                 return Error.Conflict("EMAIL_DUPLICADO", "Email já cadastrado.");
 
-            var senhaHash = BCrypt.Net.BCrypt.HashPassword(request.Senha);
+            var senhaHash = BCrypt.Net.BCrypt.HashPassword(senha);
+            usuario.AtualizarDados(nome, email, telefone);
+            usuario.DefinirSenha(senhaHash);
 
-            usuario = new Usuario(
-                request.Nome,
-                cpfResult.Value,
-                emailResult.Value,
-                senhaHash,
-                telefone);
-
-            await _usuarioRepo.AddAsync(usuario, cancellationToken);
-
-            // Criar Perfil Passageiro automático
-            var perfilPassageiro = Perfil.CriarPassageiro(usuario.Id);
-            usuario.AdicionarPerfil(perfilPassageiro);
-            await _perfilRepo.AddAsync(perfilPassageiro, cancellationToken);
-        }
-        else
-        {
-            // ── CPF já existe → reutilizar Usuario ──
-            usuario = usuarioExistente;
-
-            // Verificar se já possui Perfil Gerente
-            if (usuario.Perfis.Any(p => p.Tipo == Domain.Enums.TipoPerfil.Gerente))
-                return Error.Conflict("GERENTE_EXISTENTE", "Usuário já possui perfil de gerente.");
-
-            if (usuario.Email is null)
-            {
-                // Usuario existente sem email (ex-Motorista):
-                // verificar se o email não pertence a outro usuario
-                var emailDeOutroUsuario = await _usuarioRepo.GetByEmailAsync(emailResult.Value, cancellationToken);
-
-                if (emailDeOutroUsuario is not null && emailDeOutroUsuario.Id != usuario.Id)
-                    return Error.Conflict("EMAIL_DUPLICADO", "Email já cadastrado.");
-
-                // Atualizar dados do usuario
-                var senhaHash = BCrypt.Net.BCrypt.HashPassword(request.Senha);
-                usuario.AtualizarDados(request.Nome, emailResult.Value, telefone);
-                usuario.DefinirSenha(senhaHash);
-            }
-            else
-            {
-                // Usuario já possui email → apenas adiciona o perfil Gerente
-                // A senha informada no request é IGNORADA
-                if (telefone is not null)
-                {
-                    usuario.AtualizarDados(usuario.Nome, usuario.Email, telefone);
-                }
-            }
+            return Result<Usuario>.Success(usuario);
         }
 
-        // ────────────────────────────────────────────────────────────
-        // PASSO 5: Definir taxa (Fluxo 0800 — RN03/RN16)
-        // ────────────────────────────────────────────────────────────
-        var totalGerentes = await _perfilRepo.GetByTipoAsync(Domain.Enums.TipoPerfil.Gerente, cancellationToken);
+        // Usuário já completo: só atualiza telefone (senha do request é ignorada)
+        if (telefone is not null)
+            usuario.AtualizarDados(usuario.Nome, usuario.Email, telefone);
+
+        return Result<Usuario>.Success(usuario);
+    }
+
+    private async Task<(bool gratuito, decimal taxa)> CalcularTaxaAsync(CancellationToken ct)
+    {
+        var totalGerentes = await _perfilRepo.GetByTipoAsync(TipoPerfil.Gerente, ct);
         var gratuito = totalGerentes.Count < 2;
         var taxa = gratuito ? 0m : 5.0m;
+        return (gratuito, taxa);
+    }
 
-        // ────────────────────────────────────────────────────────────
-        // PASSO 6: Criar Perfil Gerente
-        // ────────────────────────────────────────────────────────────
-        var perfilGerente = Perfil.CriarGerente(usuario.Id, slugNormalized, taxa, gratuito);
-        usuario.AdicionarPerfil(perfilGerente);
-        await _perfilRepo.AddAsync(perfilGerente, cancellationToken);
+    private static Perfil CriarPerfilGerente(Usuario usuario, string slug, bool gratuito, decimal taxa)
+    {
+        var perfil = Perfil.CriarGerente(usuario.Id, slug, taxa, gratuito);
+        usuario.AdicionarPerfil(perfil);
+        return perfil;
+    }
 
-        // ────────────────────────────────────────────────────────────
-        // PASSO 7: Persistir (Unit of Work)
-        // ────────────────────────────────────────────────────────────
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        // ────────────────────────────────────────────────────────────
-        // PASSO 8: Gerar Token JWT
-        // ────────────────────────────────────────────────────────────
+    private Result<RegistrarGerenteResponse> CriarResposta(Usuario usuario, Perfil perfilGerente, Email email)
+    {
         var perfis = usuario.Perfis.Select(p => p.Tipo.ToString()).ToList();
-        var emailParaToken = usuario.Email?.Valor ?? emailResult.Value.Valor;
+        var emailParaToken = usuario.Email?.Valor ?? email.Valor;
         var token = _tokenService.GerarToken(usuario.Id, usuario.Nome, emailParaToken, perfis);
 
-        // ────────────────────────────────────────────────────────────
-        // PASSO 9: Retornar resposta
-        // ────────────────────────────────────────────────────────────
         return Result<RegistrarGerenteResponse>.Success(new RegistrarGerenteResponse
         {
             UsuarioId = usuario.Id,
@@ -189,56 +251,43 @@ public class AuthService : IAuthService
         });
     }
 
-    // ────────────────────────────────────────────────────────────
-    // Login — US02 (Gerente) e US04 (Passageiro)
-    // ────────────────────────────────────────────────────────────
-    public async Task<Result<LoginResponse>> Login(
-        LoginRequest request,
-        CancellationToken cancellationToken = default)
+    // ════════════════════════════════════════════════════════════════
+    //  MÉTODOS PRIVADOS — Login
+    // ════════════════════════════════════════════════════════════════
+
+    private async Task<(bool valido, Error? erro)> ValidarLoginAsync(LoginRequest request, CancellationToken ct)
     {
-        // ── PASSO 1: Validar dados de entrada (FluentValidation) ──
-        var validationResult = await _loginValidator.ValidateAsync(request, cancellationToken);
+        var result = await _loginValidator.ValidateAsync(request, ct);
+        if (result.IsValid) return (true, null);
 
-        if (!validationResult.IsValid)
-        {
-            // Mensagem genérica: não revela se o erro é no email ou na senha
-            return Error.Unauthorized("CREDENCIAIS_INVALIDAS", "Email ou senha inválidos");
-        }
+        return (false, Error.Unauthorized("CREDENCIAIS_INVALIDAS", "Email ou senha inválidos"));
+    }
 
-        // ── PASSO 2: Criar Value Object Email ──
-        var emailResult = Email.Criar(request.Email);
-        if (emailResult.IsFailure)
-            return Error.Validation("EMAIL_INVALIDO", "Formato de email inválido");
-
-        // ── PASSO 3: Buscar usuário por email ──
-        var usuario = await _usuarioRepo.GetByEmailAsync(emailResult.Value, cancellationToken);
-        if (usuario is null)
-            return Error.Unauthorized("CREDENCIAIS_INVALIDAS", "Email ou senha inválidos");
-
-        // ── PASSO 4: Verificar se a conta está ativa ──
+    private static Error? VerificarEstadoConta(Usuario usuario)
+    {
         if (!usuario.Ativo)
             return Error.Forbidden("CONTA_DESATIVADA", "Conta desativada");
 
-        // ── PASSO 5: Verificar se o usuário possui senha (ativação pendente) ──
         if (usuario.SenhaHash is null)
             return Error.Unauthorized("CONTA_SEM_SENHA", "Conta ainda não ativada. Registre-se como passageiro primeiro");
 
-        // ── PASSO 6: Verificar senha com BCrypt ──
-        if (!BCrypt.Net.BCrypt.Verify(request.Senha, usuario.SenhaHash))
-            return Error.Unauthorized("CREDENCIAIS_INVALIDAS", "Email ou senha inválidos");
+        return null;
+    }
 
-        // ── PASSO 7: Buscar perfis ativos do usuário ──
-        var perfis = await _perfilRepo.GetByUsuarioIdAsync(usuario.Id, cancellationToken);
-        var perfisAtivos = perfis
+    private async Task<List<string>> BuscarPerfisAtivosAsync(Guid usuarioId, CancellationToken ct)
+    {
+        var perfis = await _perfilRepo.GetByUsuarioIdAsync(usuarioId, ct);
+        return perfis
             .Where(p => p.Ativo)
             .Select(p => p.Tipo.ToString())
             .ToList();
+    }
 
-        // ── PASSO 8: Gerar token JWT ──
+    private Result<LoginResponse> CriarRespostaLogin(Usuario usuario, List<string> perfisAtivos)
+    {
         var emailParaToken = usuario.Email?.Valor ?? string.Empty;
         var token = _tokenService.GerarToken(usuario.Id, usuario.Nome, emailParaToken, perfisAtivos);
 
-        // ── PASSO 9: Retornar resposta ──
         return Result<LoginResponse>.Success(new LoginResponse
         {
             UsuarioId = usuario.Id,

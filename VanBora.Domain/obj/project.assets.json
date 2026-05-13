@@ -8,19 +8,24 @@
     "net9.0": []
   },
   "packageFolders": {
-    "C:\\Users\\dudsl\\.nuget\\packages\\": {}
+    "C:\\Users\\rezen\\.nuget\\packages\\": {},
+    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "c:\\Users\\dudsl\\Documents\\GitHub\\BackEnd-VanBora\\VanBora.Domain\\VanBora.Domain.csproj",
+      "projectUniqueName": "c:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Domain\\VanBora.Domain.csproj",
       "projectName": "VanBora.Domain",
-      "projectPath": "c:\\Users\\dudsl\\Documents\\GitHub\\BackEnd-VanBora\\VanBora.Domain\\VanBora.Domain.csproj",
-      "packagesPath": "C:\\Users\\dudsl\\.nuget\\packages\\",
-      "outputPath": "c:\\Users\\dudsl\\Documents\\GitHub\\BackEnd-VanBora\\VanBora.Domain\\obj\\",
+      "projectPath": "c:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Domain\\VanBora.Domain.csproj",
+      "packagesPath": "C:\\Users\\rezen\\.nuget\\packages\\",
+      "outputPath": "c:\\Users\\rezen\\source\\repos\\BackEnd-VanBora\\VanBora.Domain\\obj\\",
       "projectStyle": "PackageReference",
+      "fallbackFolders": [
+        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+      ],
       "configFilePaths": [
-        "C:\\Users\\dudsl\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\rezen\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
@@ -67,7 +72,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.314/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.309/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
