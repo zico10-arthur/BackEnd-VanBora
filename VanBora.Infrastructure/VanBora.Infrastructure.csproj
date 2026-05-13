@@ -2,6 +2,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\VanBora.Domain\VanBora.Domain.csproj" />
+    <ProjectReference Include="..\VanBora.Application\VanBora.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.3" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.3.1" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.3.1" />
   </ItemGroup>
 
   <PropertyGroup>
