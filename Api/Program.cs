@@ -46,23 +46,26 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 // ── Validators ──────────────────────────────────────────────────
 builder.Services.AddScoped<IValidator<RegistrarGerenteRequest>, RegistrarGerenteValidator>();
 builder.Services.AddScoped<IValidator<LoginRequest>, LoginValidator>();
+builder.Services.AddScoped<IValidator<RegistrarPassageiroRequest>, RegistrarPassageiroRequestValidator>();
 
 // ── Infrastructure ──────────────────────────────────────────────
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// ── Controllers + OpenAPI ───────────────────────────────────────
+// ── Controllers + Swagger (Swashbuckle) ─────────────────────────
+// Evitar Microsoft.AspNetCore.OpenApi no mesmo projeto: conflito de Microsoft.OpenApi em runtime com Swashbuckle.
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<ResultFilter>();
 });
-builder.Services.AddOpenApi();
+builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
 // ── Middleware Pipeline ─────────────────────────────────────────
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseMiddleware<ExceptionMiddleware>();

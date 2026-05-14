@@ -12,4 +12,8 @@ public interface IAuthService
     Task<Result<LoginResponse>> Login(
         LoginRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<Result<RegistrarPassageiroResponse>> RegistrarPassageiroAsync(
+        RegistrarPassageiroRequest request,
+        CancellationToken cancellationToken = default);
 }

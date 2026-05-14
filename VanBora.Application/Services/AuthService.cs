@@ -17,6 +17,7 @@ public class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly IValidator<RegistrarGerenteRequest> _registrarGerenteValidator;
     private readonly IValidator<LoginRequest> _loginValidator;
+    private readonly IValidator<RegistrarPassageiroRequest> _registrarPassageiroValidator;
 
     public AuthService(
         IUsuarioRepository usuarioRepo,
@@ -24,7 +25,8 @@ public class AuthService : IAuthService
         IUnitOfWork unitOfWork,
         ITokenService tokenService,
         IValidator<RegistrarGerenteRequest> registrarGerenteValidator,
-        IValidator<LoginRequest> loginValidator)
+        IValidator<LoginRequest> loginValidator,
+        IValidator<RegistrarPassageiroRequest> registrarPassageiroValidator)
     {
         _usuarioRepo = usuarioRepo;
         _perfilRepo = perfilRepo;
@@ -32,6 +34,7 @@ public class AuthService : IAuthService
         _tokenService = tokenService;
         _registrarGerenteValidator = registrarGerenteValidator;
         _loginValidator = loginValidator;
+        _registrarPassageiroValidator = registrarPassageiroValidator;
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -107,6 +110,129 @@ public class AuthService : IAuthService
 
         // 7. Gerar token + resposta
         return CriarRespostaLogin(usuario, perfisAtivos);
+    }
+
+    public async Task<Result<RegistrarPassageiroResponse>> RegistrarPassageiroAsync(
+        RegistrarPassageiroRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var validacao = await _registrarPassageiroValidator
+            .ValidateAsync(request, cancellationToken)
+            .ConfigureAwait(false);
+        if (!validacao.IsValid)
+        {
+            var mensagem = string.Join(" ", validacao.Errors.Select(e => e.ErrorMessage));
+            return Result<RegistrarPassageiroResponse>.Failure(
+                Error.Validation("VALIDACAO_DTO", mensagem));
+        }
+
+        var cpfResultado = CPF.Criar(request.Cpf);
+        if (cpfResultado.IsFailure)
+            return Result<RegistrarPassageiroResponse>.Failure(cpfResultado.Error);
+
+        var emailResultado = Email.Criar(request.Email);
+        if (emailResultado.IsFailure)
+            return Result<RegistrarPassageiroResponse>.Failure(emailResultado.Error);
+
+        var telefoneResultado = Telefone.Criar(request.Telefone);
+        if (telefoneResultado.IsFailure)
+            return Result<RegistrarPassageiroResponse>.Failure(telefoneResultado.Error);
+
+        var cpf = cpfResultado.Value;
+        var email = emailResultado.Value;
+        var telefone = telefoneResultado.Value;
+        var nome = request.Nome.Trim();
+
+        var existentePorCpf = await _usuarioRepo
+            .GetByCpfAsync(cpf, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (existentePorCpf is null)
+            return await RegistrarNovoPassageiroAsync(nome, cpf, email, telefone, request.Senha, cancellationToken)
+                .ConfigureAwait(false);
+
+        if (!string.IsNullOrWhiteSpace(existentePorCpf.SenhaHash))
+        {
+            return Result<RegistrarPassageiroResponse>.Failure(
+                Error.Conflict("CPF_JA_CADASTRADO", "CPF já cadastrado."));
+        }
+
+        return await CompletarCadastroContaPendenteAsync(
+                existentePorCpf, nome, email, telefone, request.Senha, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<Result<RegistrarPassageiroResponse>> RegistrarNovoPassageiroAsync(
+        string nome,
+        CPF cpf,
+        Email email,
+        Telefone telefone,
+        string senhaPlana,
+        CancellationToken cancellationToken)
+    {
+        if (await _usuarioRepo.GetByEmailAsync(email, cancellationToken).ConfigureAwait(false) is not null)
+        {
+            return Result<RegistrarPassageiroResponse>.Failure(
+                Error.Conflict("EMAIL_JA_CADASTRADO", "Email já cadastrado."));
+        }
+
+        var senhaHash = BCrypt.Net.BCrypt.HashPassword(senhaPlana);
+        var usuario = new Usuario(nome, cpf, email, senhaHash, telefone);
+        var perfilPassageiro = Perfil.CriarPassageiro(usuario.Id);
+        usuario.AdicionarPerfil(perfilPassageiro);
+
+        await _usuarioRepo.AddAsync(usuario, cancellationToken).ConfigureAwait(false);
+        await _perfilRepo.AddAsync(perfilPassageiro, cancellationToken).ConfigureAwait(false);
+        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return MontarRespostaPassageiro(usuario);
+    }
+
+    private async Task<Result<RegistrarPassageiroResponse>> CompletarCadastroContaPendenteAsync(
+        Usuario usuario,
+        string nome,
+        Email email,
+        Telefone telefone,
+        string senhaPlana,
+        CancellationToken cancellationToken)
+    {
+        var donoDoEmail = await _usuarioRepo.GetByEmailAsync(email, cancellationToken).ConfigureAwait(false);
+        if (donoDoEmail is not null && donoDoEmail.Id != usuario.Id)
+        {
+            return Result<RegistrarPassageiroResponse>.Failure(
+                Error.Conflict("EMAIL_JA_CADASTRADO", "Email já cadastrado."));
+        }
+
+        var senhaHash = BCrypt.Net.BCrypt.HashPassword(senhaPlana);
+        usuario.AtualizarDados(nome, email, telefone);
+        usuario.DefinirSenha(senhaHash);
+        usuario.Ativar();
+
+        if (!usuario.Perfis.Any(p => p.Tipo == TipoPerfil.Passageiro))
+        {
+            var perfilPassageiro = Perfil.CriarPassageiro(usuario.Id);
+            usuario.AdicionarPerfil(perfilPassageiro);
+            await _perfilRepo.AddAsync(perfilPassageiro, cancellationToken).ConfigureAwait(false);
+        }
+
+        _usuarioRepo.Update(usuario);
+        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return MontarRespostaPassageiro(usuario);
+    }
+
+    private Result<RegistrarPassageiroResponse> MontarRespostaPassageiro(Usuario usuario)
+    {
+        var perfilPassageiroId = usuario.Perfis
+            .First(p => p.Tipo == TipoPerfil.Passageiro)
+            .Id;
+
+        var token = _tokenService.GerarToken(usuario);
+
+        return Result<RegistrarPassageiroResponse>.Success(
+            new RegistrarPassageiroResponse(usuario.Id, perfilPassageiroId, token));
     }
 
     // ════════════════════════════════════════════════════════════════

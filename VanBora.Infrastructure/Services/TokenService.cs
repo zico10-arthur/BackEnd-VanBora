@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using VanBora.Application.Interfaces;
 using VanBora.Application.Settings;
+using VanBora.Domain.Entities;
 
 namespace VanBora.Infrastructure.Services;
 
@@ -16,6 +17,20 @@ public class TokenService : ITokenService
     public TokenService(IOptions<JwtSettings> jwtSettings)
     {
         _jwtSettings = jwtSettings.Value;
+    }
+
+    public string GerarToken(Usuario usuario)
+    {
+        ArgumentNullException.ThrowIfNull(usuario);
+
+        var perfis = usuario.Perfis
+            .Where(p => p.Ativo)
+            .Select(p => p.Tipo.ToString())
+            .ToList();
+
+        var email = usuario.Email?.Valor ?? string.Empty;
+
+        return GerarToken(usuario.Id, usuario.Nome, email, perfis);
     }
 
     public string GerarToken(Guid usuarioId, string nome, string email, List<string> perfis)

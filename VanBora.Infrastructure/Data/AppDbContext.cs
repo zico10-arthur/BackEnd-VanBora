@@ -14,6 +14,15 @@ public class AppDbContext : DbContext, IUnitOfWork
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // Evita descoberta transitiva de Van/Viagem/Reserva até existirem configurações dedicadas.
+        modelBuilder.Entity<Perfil>(entity =>
+        {
+            entity.Ignore(p => p.Vans);
+            entity.Ignore(p => p.Viagens);
+            entity.Ignore(p => p.ViagemVansDirigindo);
+            entity.Ignore(p => p.MotoristasCriados);
+        });
+
         modelBuilder.ApplyConfiguration(new UsuarioConfiguration());
         modelBuilder.ApplyConfiguration(new PerfilConfiguration());
 

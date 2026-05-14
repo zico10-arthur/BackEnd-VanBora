@@ -16,9 +16,15 @@ public sealed class Telefone
         "96", "97", "98", "99"
     };
 
-    public string DDD { get; }
-    public string Numero { get; }
+    public string DDD { get; private set; } = string.Empty;
+    public string Numero { get; private set; } = string.Empty;
     public string ValorCompleto => DDD + Numero;
+
+#pragma warning disable CS8618 // EF Core materialization
+    private Telefone()
+    {
+    }
+#pragma warning restore CS8618
 
     private Telefone(string ddd, string numero)
     {

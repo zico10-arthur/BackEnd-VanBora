@@ -27,6 +27,10 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
                 .IsRequired()
                 .HasMaxLength(11)
                 .HasColumnName("cpf");
+
+            cpf.HasIndex(c => c.Valor)
+                .IsUnique()
+                .HasDatabaseName("ix_usuarios_cpf");
         });
 
         builder.OwnsOne(u => u.Email, email =>
@@ -34,6 +38,11 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
             email.Property(e => e.Valor)
                 .HasMaxLength(254)
                 .HasColumnName("email");
+
+            email.HasIndex(e => e.Valor)
+                .IsUnique()
+                .HasDatabaseName("ix_usuarios_email")
+                .HasFilter("\"email\" IS NOT NULL");
         });
 
         builder.Property(u => u.SenhaHash)
@@ -59,16 +68,6 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
         builder.Property(u => u.CriadoEm)
             .IsRequired()
             .HasColumnName("criado_em");
-
-        // Índices únicos
-        builder.HasIndex("CPF_Valor")
-            .HasDatabaseName("ix_usuarios_cpf")
-            .IsUnique();
-
-        builder.HasIndex("Email_Valor")
-            .HasDatabaseName("ix_usuarios_email")
-            .IsUnique()
-            .HasFilter("\"email\" IS NOT NULL");
 
         // Relacionamento 1:N com Perfil
         builder.HasMany(u => u.Perfis)
