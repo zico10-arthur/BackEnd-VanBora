@@ -7,12 +7,12 @@ public class ViagemVan
     public Guid Id { get; private set; }
     public Guid ViagemId { get; private set; }
     public Guid VanId { get; private set; }
-    public Guid? MotoristaPerfilId { get; private set; }
+    public Guid? MotoristaUsuarioId { get; private set; }
 
     // Navigation properties
     public Viagem Viagem { get; private set; } = null!;
     public Van Van { get; private set; } = null!;
-    public Perfil? MotoristaPerfil { get; private set; }
+    public Usuario? MotoristaUsuario { get; private set; }
 
     private readonly List<Reserva> _reservas = [];
     public IReadOnlyCollection<Reserva> Reservas => _reservas.AsReadOnly();
@@ -33,16 +33,16 @@ public class ViagemVan
         Van = van;
     }
 
-    public void AlocarMotorista(Guid motoristaPerfilId)
+    public void AlocarMotorista(Guid motoristaUsuarioId)
     {
-        Guard.AgainstEmptyGuid(motoristaPerfilId, nameof(motoristaPerfilId));
+        Guard.AgainstEmptyGuid(motoristaUsuarioId, nameof(motoristaUsuarioId));
 
-        MotoristaPerfilId = motoristaPerfilId;
+        MotoristaUsuarioId = motoristaUsuarioId;
     }
 
     public void DesalocarMotorista()
     {
-        MotoristaPerfilId = null;
+        MotoristaUsuarioId = null;
     }
 
     public int ObterQuantidadeAssentosParaReserva()

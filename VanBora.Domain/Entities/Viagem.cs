@@ -6,7 +6,7 @@ namespace VanBora.Domain.Entities;
 public class Viagem
 {
     public Guid Id { get; private set; }
-    public Guid GerentePerfilId { get; private set; }
+    public Guid GerenteUsuarioId { get; private set; }
     public string NomeEvento { get; private set; }
     public DateTime DataEvento { get; private set; }
     public string LocalEvento { get; private set; }
@@ -18,7 +18,7 @@ public class Viagem
     public DateTime CriadoEm { get; private set; }
 
     // Navigation properties
-    public Perfil GerentePerfil { get; private set; } = null!;
+    public Usuario GerenteUsuario { get; private set; } = null!;
     private readonly List<ViagemVan> _viagemVans = [];
     public IReadOnlyCollection<ViagemVan> ViagemVans => _viagemVans.AsReadOnly();
 
@@ -27,7 +27,7 @@ public class Viagem
 #pragma warning restore CS8618
 
     public Viagem(
-        Guid gerentePerfilId,
+        Guid gerenteUsuarioId,
         string nomeEvento,
         DateTime dataEvento,
         string localEvento,
@@ -36,7 +36,7 @@ public class Viagem
         decimal precoAssento,
         bool possuiIngresso)
     {
-        Guard.AgainstEmptyGuid(gerentePerfilId, nameof(gerentePerfilId));
+        Guard.AgainstEmptyGuid(gerenteUsuarioId, nameof(gerenteUsuarioId));
         Guard.AgainstNullOrWhiteSpace(nomeEvento, nameof(nomeEvento));
         Guard.AgainstNullOrWhiteSpace(localEvento, nameof(localEvento));
         Guard.AgainstNullOrWhiteSpace(localPartida, nameof(localPartida));
@@ -44,7 +44,7 @@ public class Viagem
         Guard.AgainstInvalidState(dataPartida < dataEvento, "Data de partida deve ser anterior à data do evento.");
 
         Id = Guid.NewGuid();
-        GerentePerfilId = gerentePerfilId;
+        GerenteUsuarioId = gerenteUsuarioId;
         NomeEvento = nomeEvento;
         DataEvento = dataEvento;
         LocalEvento = localEvento;

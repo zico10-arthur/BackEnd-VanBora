@@ -1,7 +1,6 @@
 using VanBora.Application.Interfaces;
 using VanBora.Domain.Common;
 using VanBora.Domain.Entities;
-using VanBora.Domain.Enums;
 using VanBora.Domain.Interfaces;
 using VanBora.Domain.ValueObjects;
 
@@ -51,7 +50,7 @@ public class UsuarioService : IUsuarioService
         var existente = await _usuarioRepo.GetByCpfAsync(cpf.Value, cancellationToken);
 
         if (existente is null)
-            return await CriarNovoUsuarioAsync(nome, cpf.Value, email.Value, telefone, senha, cancellationToken);
+            return await CriarNovoPassageiroAsync(nome, cpf.Value, email.Value, telefone, senha, cancellationToken);
 
         return await ValidarEAtualizarExistenteAsync(existente, nome, email.Value, senha, telefone, cancellationToken);
     }
@@ -83,10 +82,14 @@ public class UsuarioService : IUsuarioService
         return Result<Usuario>.Success(usuario);
     }
 
+    public async Task<bool> SlugJaEmUsoAsync(string slug, CancellationToken cancellationToken = default)
+    {
+        var existente = await _usuarioRepo.GetBySlugAsync(slug, cancellationToken);
+        return existente is not null;
+    }
+
     private static Result<CPF> CriarCpf(string cpf) => CPF.Criar(cpf);
-
     private static Result<Email> CriarEmail(string email) => Email.Criar(email);
-
     private static Result<Telefone> CriarTelefone(string telefone) => Telefone.Criar(telefone);
 
     private async Task<bool> EmailDisponivelAsync(Email email, Guid? ignorarUsuarioId, CancellationToken cancellationToken)
@@ -94,11 +97,10 @@ public class UsuarioService : IUsuarioService
         var donoDoEmail = await _usuarioRepo.GetByEmailAsync(email, cancellationToken);
         if (donoDoEmail is null)
             return true;
-
         return donoDoEmail.Id == ignorarUsuarioId;
     }
 
-    private async Task<Result<Usuario>> CriarNovoUsuarioAsync(
+    private async Task<Result<Usuario>> CriarNovoPassageiroAsync(
         string nome, CPF cpf, Email email, Telefone? telefone, string senha,
         CancellationToken cancellationToken)
     {
@@ -107,7 +109,7 @@ public class UsuarioService : IUsuarioService
             return Error.Conflict("EMAIL_DUPLICADO", "Email já cadastrado.");
 
         var senhaHash = BCrypt.Net.BCrypt.HashPassword(senha);
-        var usuario = new Usuario(nome, cpf, email, senhaHash, telefone);
+        var usuario = Usuario.CriarPassageiro(nome, cpf, email, senhaHash, telefone);
 
         await _usuarioRepo.AddAsync(usuario, cancellationToken);
 
@@ -118,9 +120,6 @@ public class UsuarioService : IUsuarioService
         Usuario usuario, string nome, Email email, string senha, Telefone? telefone,
         CancellationToken cancellationToken)
     {
-        if (usuario.Perfis.Any(p => p.Tipo == TipoPerfil.Gerente))
-            return Error.Conflict("GERENTE_EXISTENTE", "Usuário já possui perfil de gerente.");
-
         if (usuario.Email is null)
         {
             var emailDisponivel = await EmailDisponivelAsync(email, usuario.Id, cancellationToken);

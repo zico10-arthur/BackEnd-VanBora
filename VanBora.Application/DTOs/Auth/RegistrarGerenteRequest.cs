@@ -8,4 +8,5 @@ public class RegistrarGerenteRequest
     public string Senha { get; set; } = string.Empty;
     public string? Telefone { get; set; }
     public string Slug { get; set; } = string.Empty;
+    public string? ChavePix { get; set; }
 }

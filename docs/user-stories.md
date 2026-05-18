@@ -4,31 +4,29 @@
 
 ---
 
-## US01 — Cadastro de Gerente (Usuario + Perfil Gerente)
+## US01 — Cadastro de Gerente
 
 **Como** um gerente de van
-**Quero** me cadastrar na plataforma VanBora como gerente (criar Usuario + Perfil Passageiro + Perfil Gerente)
+**Quero** me cadastrar na plataforma VanBora como gerente (Usuario com Tipo = Gerente)
 **Para** gerenciar minhas vans e criar viagens
 
-> **Modelo:** O cadastro de gerente cria um **Usuario** (conta única com email/senha), um **Perfil Passageiro** automático e um **Perfil Gerente**. Se o CPF já existir (ex: a pessoa já se cadastrou como passageiro), o sistema apenas adiciona o Perfil Gerente ao Usuario existente. O login é único (email + senha do Usuario), e o gerente também pode reservar assentos em viagens de outros gerentes.
+> **Modelo:** O cadastro de gerente cria um **Usuario** com `Tipo = Gerente` via `Usuario.CriarGerente()`. Se o CPF já existir como Passageiro, o sistema faz `UpgradeParaGerente()` — o Tipo muda para Gerente de forma irreversível. O login é único (email + senha do Usuario), e o gerente também pode reservar assentos em viagens de outros gerentes.
 
 ### Cenários de Aceitação
 
 ```gherkin
-Cenário: Cadastro bem-sucedido (novo Usuario + Gerente)
+Cenário: Cadastro bem-sucedido (novo Gerente)
   Dado que não existe um Usuario com o CPF informado
   Quando envio meus dados (nome, cpf, email, telefone, senha, slug)
-  Então um novo Usuario é criado
-  E um Perfil Passageiro é criado automaticamente
-  E um Perfil Gerente é vinculado
-  E recebo um token JWT com perfis = [Passageiro, Gerente]
+  Então um novo Usuario é criado com Tipo = Gerente
+  E recebo um token JWT com tipos = ["Gerente"]
 
-Cenário: Cadastro com CPF existente (adicionar Gerente)
-  Dado que já existe um Usuario com CPF "12345678909" (ex: já é Passageiro)
+Cenário: Cadastro com CPF existente (upgrade de Passageiro)
+  Dado que já existe um Usuario do tipo Passageiro com CPF "12345678909"
   Quando envio dados de cadastro de gerente com o mesmo CPF
-  Então o Usuario existente é reutilizado
-  E um novo Perfil Gerente é adicionado
-  E recebo um token JWT com perfis = [Passageiro, Gerente]
+  Então o Usuario existente é atualizado via UpgradeParaGerente()
+  E o Tipo muda para Gerente (irreversível)
+  E recebo um token JWT com tipos = ["Gerente"]
 
 Cenário: Email duplicado
   Dado que já existe um Usuario com email "contato@transpabc.com"
@@ -59,7 +57,8 @@ Cenário: Dados inválidos
   "slug": "transp-abc",
   "email": "contato@transpabc.com",
   "telefone": "11999999999",
-  "senha": "MinhaSenha123"
+  "senha": "MinhaSenha123",
+  "chavePix": "contato@transpabc.com"
 }
 ```
 
@@ -71,27 +70,24 @@ Cenário: Dados inválidos
   "email": "contato@transpabc.com",
   "telefone": "11999999999",
   "cpf": "12345678909",
-  "gerente": {
-    "perfilId": "p1p2p3p4-...",
-    "slug": "transp-abc",
-    "taxaPlataforma": 5.0,
-    "gratuito": false,
-    "ativo": true
-  },
-  "perfis": ["Passageiro", "Gerente"],
+  "slug": "transp-abc",
+  "taxaPlataforma": 5.0,
+  "gratuito": false,
+  "chavePix": "contato@transpabc.com",
+  "tipo": "Gerente",
   "token": "eyJhbGciOi..."
 }
 ```
 
 ---
 
-## US02 — Login (único para todos os perfis)
+## US02 — Login (único com TipoUsuario)
 
 **Como** um usuário cadastrado
 **Quero** fazer login na plataforma com meu email e senha únicos
 **Para** acessar minhas funcionalidades (reservar, gerenciar, etc.)
 
-> **Login único:** O login é feito com Email + Senha do **Usuario**, independente de quantos perfis a pessoa tem. O JWT retorna a lista de perfis disponíveis.
+> **Login único:** O login é feito com Email + Senha do **Usuario**. O JWT contém o TipoUsuario como claim "tipos". Cada usuário tem exatamente um tipo.
 
 ### Cenários de Aceitação
 
@@ -100,7 +96,7 @@ Cenário: Login bem-sucedido
   Dado que estou cadastrado com email "joao@email.com"
   Quando informo meu email e senha corretos
   Então recebo um token JWT válido
-  E o JWT contém meus perfis ["Passageiro", "Gerente"]
+  E o JWT contém meu tipo = "Gerente"
 
 Cenário: Senha incorreta
   Dado que estou cadastrado
@@ -113,11 +109,11 @@ Cenário: Conta inativa
   Então recebo um erro 403 Forbidden
   E a mensagem "Conta desativada"
 
-Cenário: Login como Gerente (mesmo endpoint)
-  Dado que sou gerente com email "contato@transpabc.com"
+Cenário: Login como Passageiro
+  Dado que sou passageiro com email "joao@email.com"
   Quando faço login com meu email e senha
-  Então recebo o mesmo token JWT
-  E posso acessar rotas de gerente e também reservar assentos
+  Então recebo um token JWT com tipos = ["Passageiro"]
+  E posso reservar assentos
 ```
 
 ### Exemplo
@@ -136,20 +132,20 @@ Cenário: Login como Gerente (mesmo endpoint)
   "usuarioId": "u1u2u3u4-...",
   "nome": "João Silva",
   "email": "joao@email.com",
-  "perfis": ["Passageiro", "Gerente"],
+  "tipo": "Gerente",
   "token": "eyJhbGciOi..."
 }
 ```
 
 ---
 
-## US03 — Cadastro de Usuário (Usuario + Perfil Passageiro automático)
+## US03 — Cadastro de Passageiro
 
-**Como** um usuário
+**Como** um passageiro
 **Quero** me cadastrar na plataforma VanBora
 **Para** fazer reservas em viagens
 
-> **Modelo:** O cadastro cria um **Usuario** (conta única com email/senha) e um **Perfil Passageiro** automaticamente. Login único com email + senha do Usuario. Se o CPF já existir no sistema com `SenhaHash = null` (ex: Motorista cadastrado pelo Gerente sem login), o sistema entende como **ativação de conta pendente** e completa o registro.
+> **Modelo:** O cadastro cria um **Usuario** com `Tipo = Passageiro` via `Usuario.CriarPassageiro()`. Login único com email + senha do Usuario. Se o CPF já existir no sistema com `SenhaHash = null` (ex: Motorista cadastrado pelo Gerente sem login), o sistema entende como **ativação de conta pendente** — mantém o Tipo = Motorista, apenas preenche email e senha para que o motorista possa fazer login e também reservar assentos.
 
 ### Cenários de Aceitação
 
@@ -157,18 +153,16 @@ Cenário: Login como Gerente (mesmo endpoint)
 Cenário: Cadastro bem-sucedido
   Dado que não existe Usuario com este email
   Quando envio meus dados (nome, email, cpf, telefone, senha)
-  Então um novo Usuario é criado
-  E um Perfil Passageiro é vinculado automaticamente
-  E recebo um token JWT com perfis = ["Passageiro"]
+  Então um novo Usuario é criado com Tipo = Passageiro
+  E recebo um token JWT com tipo = "Passageiro"
   E já posso reservar assentos imediatamente
 
 Cenário: CPF já existe como Motorista sem login (ativação de conta)
-  Dado que existe um Usuario com CPF "12345678909" mas SenhaHash = null (ex: Motorista cadastrado pelo Gerente)
+  Dado que existe um Usuario com CPF "12345678909" e Tipo = Motorista mas SenhaHash = null
   Quando me registro com o mesmo CPF informando email e senha
-  Então o Usuario existente é reutilizado
+  Então o Usuario existente é reutilizado (Tipo permanece Motorista)
   E o email e senha são definidos (conta ativada)
-  E um Perfil Passageiro é adicionado (se não existir)
-  E recebo um token JWT com perfis = ["Passageiro", "Motorista"]
+  E recebo um token JWT com tipo = "Motorista"
   E agora posso fazer login e reservar assentos
 
 Cenário: Email duplicado
@@ -197,11 +191,24 @@ Cenário: CPF inválido
 }
 ```
 
+**Resposta (201):**
+```json
+{
+  "usuarioId": "u1u2u3u4-...",
+  "nome": "João Silva",
+  "email": "joao@email.com",
+  "cpf": "12345678909",
+  "telefone": "11988888888",
+  "tipo": "Passageiro",
+  "token": "eyJhbGciOi..."
+}
+```
+
 ---
 
 ## US04 — Login de Usuário (mesmo endpoint do US02)
 
-> **Nota:** O login é **único** para todos os tipos de usuário. Veja US02 para detalhes completos. O mesmo endpoint `POST /api/auth/login` atende Passageiros, Gerentes e Admins.
+> **Nota:** O login é **único** para todos os tipos de usuário. Veja US02 para detalhes completos. O mesmo endpoint `POST /api/auth/login` atende Passageiros, Gerentes e Admins. Cada usuário tem exatamente **um Tipo**.
 
 ### Cenários de Aceitação
 
@@ -209,14 +216,14 @@ Cenário: CPF inválido
 Cenário: Login como passageiro
   Dado que me cadastrei como usuario com email "joao@email.com"
   Quando faço login com meu email e senha
-  Então recebo um token JWT com perfis = ["Passageiro"]
+  Então recebo um token JWT com tipo = "Passageiro"
   E posso criar reservas
 
-Cenário: Login como usuario com multiplos perfis
-  Dado que tenho perfis Passageiro e Gerente
+Cenário: Login como gerente
+  Dado que me cadastrei como gerente com email "contato@transpabc.com"
   Quando faço login
-  Então recebo um token JWT com perfis = ["Passageiro", "Gerente"]
-  E posso reservar assentos e também gerenciar viagens
+  Então recebo um token JWT com tipo = "Gerente"
+  E posso gerenciar viagens
 ```
 
 ### Exemplo
@@ -235,7 +242,7 @@ Cenário: Login como usuario com multiplos perfis
   "usuarioId": "b2c3d4e5-...",
   "nome": "João Silva",
   "email": "joao@email.com",
-  "perfis": ["Passageiro"],
+  "tipo": "Passageiro",
   "token": "eyJhbGciOi..."
 }
 ```
@@ -254,7 +261,7 @@ Cenário: Login como usuario com multiplos perfis
 Cenário: Cadastro bem-sucedido
   Dado que estou logado como gerente
   Quando cadastro uma van com nome, placa, modelo e capacidade
-  Então a van é criada e associada ao meu perfil
+  Então a van é criada e associada ao meu usuario (Gerente)
 
 Cenário: Placa duplicada
   Dado que já cadastrei uma van com placa "ABC1D23"
@@ -484,7 +491,7 @@ Cenário: Viagem sem vans alocadas
 **Quero** reservar um ou mais assentos em uma viagem
 **Para** garantir meu lugar no evento
 
-> **Nota sobre ingresso:** Após o pagamento da reserva ser confirmado, se a viagem tiver `PossuiIngresso = true`, o sistema exibe o contato do gerente para o passageiro tratar a compra do ingresso diretamente. **Qualquer usuário logado pode reservar** — independente de ter perfil Passageiro, Gerente ou Admin.
+> **Nota sobre ingresso:** Após o pagamento da reserva ser confirmado, se a viagem tiver `PossuiIngresso = true`, o sistema exibe o contato do gerente para o passageiro tratar a compra do ingresso diretamente. **Qualquer usuário logado pode reservar** — independente do Tipo (Passageiro, Gerente, Motorista ou Admin).
 
 ### Cenários de Aceitação
 
@@ -970,13 +977,13 @@ Cenário: Van não encontrada
 
 ---
 
-## US18 — Atualizar Usuario (dados compartilhados entre perfis)
+## US18 — Atualizar Usuario
 
 **Como** um usuário logado
 **Quero** atualizar meus dados pessoais (nome, email, telefone)
 **Para** manter meu cadastro sempre atualizado
 
-> **Modelo:** Nome, email e telefone ficam no **Usuario** (compartilhado entre todos os perfis). Alterar esses dados reflete em todos os perfis (Passageiro, Gerente, etc.). A senha é alterada em endpoint separado (`POST /api/auth/alterar-senha` — ver US21). CPF é imutável.
+> **Modelo:** Nome, email e telefone são dados do **Usuario** (entidade única). A senha é alterada em endpoint separado (`POST /api/auth/alterar-senha` — ver US21). CPF é imutável.
 
 ### Cenários de Aceitação
 
@@ -984,7 +991,7 @@ Cenário: Van não encontrada
 Cenário: Atualizar nome com sucesso
   Dado que estou logado
   Quando atualizo meu nome
-  Então o nome é alterado em todos os perfis do Usuario
+  Então o nome é alterado no Usuario
 
 Cenário: Atualizar email
   Dado que estou logado
@@ -1028,13 +1035,13 @@ Cenário: Tentar alterar CPF
 
 ---
 
-## US19 — Atualizar Perfil do Gerente (slug)
+## US19 — Atualizar Slug do Gerente
 
 **Como** um gerente logado
-**Quero** atualizar o nome da empresa (slug) do meu perfil gerente
-**Para** manter meu cadastro sempre atualizado
+**Quero** atualizar o nome da empresa (slug) do meu cadastro
+**Para** manter meu perfil público sempre atualizado
 
-> **Modelo:** Este endpoint atualiza apenas dados específicos do **Perfil Gerente** (slug). Nome, email e telefone são dados do **Usuario** e devem ser alterados via `PUT /api/auth/usuario` (ver US18). Senha é alterada via `POST /api/auth/alterar-senha` (ver US21).
+> **Modelo:** O slug é um campo opcional diretamente no **Usuario** (válido apenas para Tipo = Gerente). Nome, email e telefone são dados do Usuario e devem ser alterados via `PUT /api/auth/usuario` (ver US18). Senha é alterada via `POST /api/auth/alterar-senha` (ver US21).
 
 ### Cenários de Aceitação
 
@@ -1042,7 +1049,7 @@ Cenário: Tentar alterar CPF
 Cenário: Atualizar slug com sucesso
   Dado que estou logado como gerente
   Quando atualizo meu slug
-  Então o slug do Perfil Gerente é alterado
+  Então o slug do Usuario é alterado
 
 Cenário: Slug duplicado
   Dado que já existe outro gerente com o mesmo slug
@@ -1059,7 +1066,7 @@ Cenário: Tentar alterar dados do Usuario pelo endpoint errado
 
 ### Exemplo
 
-**Requisição:** `PUT /api/auth/perfil/gerente`
+**Requisição:** `PUT /api/auth/gerente/slug`
 ```json
 {
   "slug": "transp-abc-novo"
@@ -1069,7 +1076,7 @@ Cenário: Tentar alterar dados do Usuario pelo endpoint errado
 **Resposta (200):**
 ```json
 {
-  "perfilId": "p1p2p3p4-...",
+  "usuarioId": "u1u2u3u4-...",
   "slug": "transp-abc-novo",
   "tipo": "Gerente"
 }
@@ -1083,7 +1090,7 @@ Cenário: Tentar alterar dados do Usuario pelo endpoint errado
 **Quero** desativar minha conta
 **Para** remover meu acesso à plataforma, podendo reativar depois se quiser
 
-> **Modelo:** Todas as exclusões são **soft delete** (lógicas). O registro permanece no banco com `Ativo = false`. O login é único (Usuario), então desativar o **Usuario** (`Usuario.Ativo = false`) impede qualquer login. É possível também desativar **apenas um perfil específico** (ex: desativar Gerente mas manter Passageiro ativo) — neste caso o Usuario continua podendo fazer login e usar os perfis restantes. A reativação pode ser feita pelo Admin.
+> **Modelo:** Todas as exclusões são **soft delete** (lógicas). O registro permanece no banco com `Ativo = false`. Como o login é baseado no **Usuario** (entidade única), desativar o Usuario (`Usuario.Ativo = false`) impede qualquer login imediatamente. A reativação pode ser feita pelo Admin.
 
 ### Cenários de Aceitação
 
@@ -1097,16 +1104,8 @@ Cenário: Confirmar desativação com código válido
   Dado que solicitei a desativação e recebi o código
   Quando informo o código correto
   Então o Usuario é marcado como Ativo = false
-  E todos os seus perfis são marcados como Ativo = false
   E recebo uma confirmação por email
   E não consigo mais fazer login
-
-Cenário: Desativar apenas um perfil específico
-  Dado que tenho múltiplos perfis (Passageiro e Gerente)
-  Quando solicito desativar apenas o Perfil Gerente
-  Então apenas o Perfil Gerente fica com Ativo = false
-  E o Usuario permanece ativo
-  E ainda posso fazer login (login único) e usar o Perfil Passageiro
 
 Cenário: Código inválido
   Dado que solicitei a desativação
@@ -1201,13 +1200,13 @@ Cenário: Nova senha fraca
 
 ---
 
-## US22 — Admin: Buscar Usuarios e Perfis
+## US22 — Admin: Buscar Usuarios
 
 **Como** um administrador VanBora
-**Quero** pesquisar usuarios por nome ou CPF e ver seus perfis
+**Quero** pesquisar usuarios por nome, CPF ou tipo
 **Para** encontrar rapidamente uma pessoa no sistema
 
-> **Modelo:** A busca é feita na entidade **Usuario** (unificada). A resposta mostra todos os Perfis que aquele Usuario possui.
+> **Modelo:** A busca é feita na entidade **Usuario** (unificada). Cada Usuario tem exatamente um Tipo. A resposta mostra os dados do Usuario com o Tipo diretamente na raiz.
 
 ### Cenários de Aceitação
 
@@ -1216,24 +1215,19 @@ Cenário: Buscar usuario por nome
   Dado que existem usuarios cadastrados
   Quando pesquiso por "João"
   Então vejo todos os usuarios com "João" no nome
-  E cada resultado mostra a lista de perfis do usuario
+  E cada resultado mostra o tipo e dados do usuario
 
 Cenário: Buscar usuario por CPF
   Dado que existe um usuario com CPF "12345678909"
   Quando pesquiso por "12345678909"
   Então vejo apenas aquele usuario
-  E seus perfis
+  E seus dados completos
 
 Cenário: Buscar gerentes especificamente
-  Dado que existem usuarios com perfil Gerente
+  Dado que existem usuarios com Tipo = Gerente
   Quando pesquiso por "Transportadora" em /api/admin/gerentes
-  Então vejo apenas usuarios que têm Perfil Gerente
+  Então vejo apenas usuarios com Tipo = Gerente
   E que correspondem ao nome "Transportadora"
-
-Cenário: Ver perfis de um usuario
-  Dado que existe um usuario com perfis Passageiro e Gerente
-  Quando acessos os detalhes
-  Então vejo a lista completa de perfis com email, status e tipo
 
 Cenário: Nenhum resultado
   Dado que não existem usuarios com aquele nome
@@ -1253,21 +1247,8 @@ Cenário: Nenhum resultado
     "nome": "João Silva",
     "cpf": "12345678909",
     "email": "joao@email.com",
-    "perfis": [
-      {
-        "perfilId": "p1p2p3p4-...",
-        "tipo": "Passageiro",
-        "ativo": true
-      },
-      {
-        "perfilId": "p5p6p7p8-...",
-        "tipo": "Gerente",
-        "slug": "transp-abc",
-        "ativo": true,
-        "taxaPlataforma": 5.0,
-        "totalViagens": 5
-      }
-    ],
+    "tipo": "Passageiro",
+    "ativo": true,
     "totalReservas": 3,
     "criadoEm": "2026-05-01T10:00:00Z"
   }
@@ -1281,19 +1262,14 @@ Cenário: Nenhum resultado
 [
   {
     "usuarioId": "u1u2u3u4-...",
-    "nome": "João Silva",
+    "nome": "Transportadora ABC",
     "cpf": "12345678909",
     "email": "contato@transpabc.com",
-    "perfis": [
-      {
-        "perfilId": "p5p6p7p8-...",
-        "tipo": "Gerente",
-        "slug": "transp-abc",
-        "ativo": true,
-        "taxaPlataforma": 5.0,
-        "totalViagens": 5
-      }
-    ],
+    "tipo": "Gerente",
+    "slug": "transp-abc",
+    "ativo": true,
+    "taxaPlataforma": 5.0,
+    "totalViagens": 5,
     "criadoEm": "2026-04-01T10:00:00Z"
   }
 ]
@@ -1389,33 +1365,34 @@ Cenário: Histórico vazio
 
 ---
 
-## US24 — Gerente: Cadastrar Motorista (Perfil Motorista)
+## US24 — Gerente: Cadastrar Motorista
 
 **Como** um gerente de van
 **Quero** cadastrar motoristas no sistema
 **Para** alocá-los nas viagens e controlar minha frota
 
-> **Modelo:** O Motorista é um **Perfil** (Tipo=Motorista) vinculado a um **Usuario**. O sistema busca um Usuario existente pelo CPF informado. Se existir com `SenhaHash != null`, cria Perfil Motorista para ele (já pode fazer login). Se existir com `SenhaHash = null`, atualiza dados e cria Perfil Motorista. Se não existir, cria um novo Usuario com `Email = null` e `SenhaHash = null` + Perfil Motorista. O Motorista **não tem login inicialmente**, mas pode depois **ativar a conta** registrando-se como Passageiro com o mesmo CPF (US03).
+> **Modelo:** O Motorista é um **Usuario** com `Tipo = Motorista` criado via `Usuario.CriarMotorista()`. O Gerente informa nome, CPF, telefone e CNH. O sistema cria um novo Usuario com `Tipo = Motorista`, `Email = null`, `SenhaHash = null` e `CriadoPorUsuarioId = id do Gerente`. O Motorista **não tem login inicialmente**, mas pode depois **ativar a conta** registrando-se pelo endpoint de passageiro (US03) com o mesmo CPF — neste caso o Tipo permanece Motorista, apenas email e senha são preenchidos.
 
 ### Cenários de Aceitação
 
 ```gherkin
-Cenário: Cadastrar motorista com CPF existente
-  Dado que estou logado como gerente
-  E que existe um Usuario com CPF "98765432100"
-  Quando informo nome, CPF, telefone e CNH do motorista
-  Então um Perfil Motorista é criado vinculado ao Usuario existente
-  E recebo os dados do motorista criado
-
 Cenário: Cadastrar motorista com CPF novo
   Dado que estou logado como gerente
   E que NÃO existe um Usuario com o CPF informado
-  Quando informo nome, CPF, telefone e CNH
-  Então um novo Usuario é criado
-  E um Perfil Motorista é vinculado a ele
+  Quando informo nome, CPF, telefone e CNH do motorista
+  Então um novo Usuario é criado com Tipo = Motorista via CriarMotorista()
+  E o CriadoPorUsuarioId é vinculado ao gerente logado
+  E recebo os dados do motorista criado
 
-Cenário: Motorista já cadastrado no mesmo gerente
-  Dado que já existe um Perfil Motorista com CPF "98765432100" vinculado ao meu gerente
+Cenário: CPF já existe como Usuario (com email)
+  Dado que estou logado como gerente
+  E que existe um Usuario com CPF "98765432100" e Email != null
+  Quando informo nome, CPF, telefone e CNH
+  Então recebo um erro 409
+  E a mensagem "CPF já cadastrado no sistema"
+
+Cenário: Motorista já cadastrado pelo gerente
+  Dado que já existe um Usuario com Tipo = Motorista e CPF "98765432100" vinculado ao meu gerente
   Quando tento cadastrar outro motorista com o mesmo CPF
   Então recebo um erro 409
   E a mensagem "Motorista já cadastrado"
@@ -1436,15 +1413,14 @@ Cenário: Listar motoristas cadastrados
   Dado que estou logado como gerente
   E que cadastrei 3 motoristas
   Quando solicito a lista de motoristas
-  Então vejo os 3 motoristas cadastrados
-  E cada motorista mostra nome, CPF, telefone e status
+  Então vejo os 3 motoristas cadastrados (Tipo = Motorista, CriadoPorUsuarioId = meu id)
+  E cada motorista mostra nome, CPF, telefone, CNH e status
 
 Cenário: Remover motorista sem viagens futuras
   Dado que estou logado como gerente
   E que o motorista não está alocado em nenhuma viagem futura
   Quando removo o motorista
-  Então o Perfil Motorista é removido (exclusão lógica ou física)
-  E o Usuario permanece no sistema (pode ter outros perfis)
+  Então o Usuario com Tipo = Motorista é removido (exclusão lógica ou física)
 
 Cenário: Remover motorista alocado em viagem futura
   Dado que estou logado como gerente
@@ -1470,12 +1446,13 @@ Cenário: Remover motorista alocado em viagem futura
 ```json
 {
   "usuarioId": "u1u2u3u4-...",
-  "perfilId": "p1p2p3p4-...",
   "nome": "Carlos Santos",
   "cpf": "98765432100",
   "telefone": "11977777777",
   "cnh": "12345678901",
+  "tipo": "Motorista",
   "ativo": true,
+  "criadoPorUsuarioId": "g1g2g3g4-...",
   "criadoEm": "2026-05-05T10:00:00Z"
 }
 ```
@@ -1487,12 +1464,13 @@ Cenário: Remover motorista alocado em viagem futura
 [
   {
     "usuarioId": "u1u2u3u4-...",
-    "perfilId": "p1p2p3p4-...",
     "nome": "Carlos Santos",
     "cpf": "98765432100",
     "telefone": "11977777777",
     "cnh": "12345678901",
+    "tipo": "Motorista",
     "ativo": true,
+    "criadoPorUsuarioId": "g1g2g3g4-...",
     "criadoEm": "2026-05-05T10:00:00Z"
   }
 ]

@@ -8,23 +8,19 @@ namespace VanBora.Infrastructure.Data;
 public class AppDbContext : DbContext, IUnitOfWork
 {
     public DbSet<Usuario> Usuarios => Set<Usuario>();
-    public DbSet<Perfil> Perfis => Set<Perfil>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Evita descoberta transitiva de Van/Viagem/Reserva até existirem configurações dedicadas.
-        modelBuilder.Entity<Perfil>(entity =>
-        {
-            entity.Ignore(p => p.Vans);
-            entity.Ignore(p => p.Viagens);
-            entity.Ignore(p => p.ViagemVansDirigindo);
-            entity.Ignore(p => p.MotoristasCriados);
-        });
+        modelBuilder.Ignore<Van>();
+        modelBuilder.Ignore<Viagem>();
+        modelBuilder.Ignore<ViagemVan>();
+        modelBuilder.Ignore<ItemReserva>();
+        modelBuilder.Ignore<Reserva>();
 
         modelBuilder.ApplyConfiguration(new UsuarioConfiguration());
-        modelBuilder.ApplyConfiguration(new PerfilConfiguration());
 
         // Demais configurações (Van, Viagem, etc.) serão adicionadas em Sprints futuras
     }

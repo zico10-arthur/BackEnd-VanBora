@@ -41,69 +41,61 @@ flowchart LR
 
 ```mermaid
 erDiagram
-    Usuario ||--o{ Perfil : "tem"
-    Perfil ||--o{ Van : "possui_tipo_gerente"
-    Perfil ||--o{ Viagem : "cria_tipo_gerente"
-    Perfil ||--o{ Perfil : "registra_tipo_gerente_para_motorista"
+    Usuario ||--o{ Van : "gerente_dono"
+    Usuario ||--o{ Viagem : "gerente_cria"
+    Usuario ||--o{ Usuario : "criado_por"
     Viagem ||--|{ ViagemVan : "escala"
     Van ||--|{ ViagemVan : "alocada_em"
-    Perfil ||--o{ ViagemVan : "dirige_tipo_motorista"
+    Usuario ||--o{ ViagemVan : "motorista_dirige"
     ViagemVan ||--o{ Reserva : "recebe"
     Usuario ||--o{ Reserva : "faz"
     Reserva ||--|{ ItemReserva : "contem"
 ```
 
-> **Nota sobre Perfil auto-relacionamento:** Um Perfil do tipo Gerente "registra" Perfis do tipo Motorista. Na prática, o Perfil do Motorista possui uma FK `CriadoPorPerfilId` → Perfil.Id (Gerente).
+> **Nota sobre auto-relacionamento Usuario:** Um Usuario do tipo Gerente "cria" Usuarios do tipo Motorista. O Motorista possui uma FK `CriadoPorUsuarioId` → Usuario.Id (Gerente). Não existe mais entidade Perfil — o TipoUsuario (enum) está diretamente no Usuario.
 
 ### 2.2. Entidades de Domínio
 
-#### Usuario (Conta Única — login + pessoa física)
+#### Usuario (Conta Única — TipoUsuario determinando o papel)
 
 | Propriedade | Tipo | Descrição |
 |-------------|------|-----------|
 | Id | Guid | Chave primária |
+| Tipo | TipoUsuario | Passageiro, Gerente, Motorista, Admin — **papel único do usuário** |
 | Nome | string | Nome completo |
 | CPF | CPF | Value Object — **único no sistema**, imutável após cadastro |
 | Email | Email? | Value Object — **único no sistema**, usado para login. `null` para Motoristas que ainda não ativaram a conta |
 | SenhaHash | string? | Hash da senha (BCrypt). `null` para Motoristas que ainda não ativaram a conta |
 | Telefone | Telefone? | Value Object (nullable) |
+| Slug | string? | **Único** — apenas para Gerentes. Identificador público (ex: `transp-abc`) |
+| TaxaPlataforma | decimal | Percentual da taxa VanBora. Apenas relevante para Gerentes |
+| Gratuito | bool | Se o Gerente é 0800 (taxa zero). Apenas relevante para Gerentes |
+| ChavePix | string? | Chave Pix do Gerente para recebimento |
+| CNH | CNH? | Value Object — apenas para Motoristas |
+| CriadoPorUsuarioId | Guid? | FK → Usuario.Id (Gerente que cadastrou este Motorista) |
+| CriadoEm | DateTime | Data de criação |
+| DataAtualizacao | DateTime? | Data da última atualização |
 | Ativo | bool | Se a conta está ativa |
-| CriadoEm | DateTime | Data de criação |
 
-> Um **Usuario** é a **conta única** do sistema. O login é feito com Email + Senha do Usuario (apenas contas com `SenhaHash != null`). Pode ter múltiplos perfis (Passageiro, Gerente, Motorista, Admin). **Qualquer usuário logado pode reservar assentos** — independentemente do tipo de perfil.
+> **Modelo unificado:** O **Usuario** agora contém **todos** os atributos. O `TipoUsuario` (enum) determina o papel no sistema. Não existe mais entidade Perfil separada. Os campos Slug, TaxaPlataforma, Gratuito, ChavePix são específicos de Gerentes; CNH é específica de Motoristas; os demais tipos ignoram esses campos.
 >
-> **Motorista sem login:** Quando o Gerente cadastra um Motorista, o sistema cria um Usuario com `Email = null` e `SenhaHash = null`. Este Usuario não pode fazer login até que a pessoa se registre como Passageiro (mesmo CPF) e defina email + senha. Nesse momento, o sistema ativa a conta e adiciona o Perfil Passageiro.
-
-#### Perfil (Papel do Usuario no sistema)
-
-| Propriedade | Tipo | Descrição |
-|-------------|------|-----------|
-| Id | Guid | Chave primária |
-| UsuarioId | Guid | FK → Usuario |
-| Tipo | TipoPerfil | Passageiro, Gerente, Motorista, Admin |
-| Ativo | bool | Se o perfil está ativo |
-| CriadoPorPerfilId | Guid? | FK → Perfil (Gerente que cadastrou, apenas para Tipo=Motorista) |
-| CriadoEm | DateTime | Data de criação |
-
-**Campos específicos por Tipo:**
-
-> Perfil Passageiro não possui campos específicos — usa apenas os dados do Usuario (Nome, CPF, Email, Telefone).
-
-| Campo | Gerente | Motorista | Admin |
-|-------|---------|-----------|-------|
-| Slug | ✅ (único) | ❌ | ❌ |
-| TaxaPlataforma | ✅ (%) | ❌ | ❌ |
-| Gratuito | ✅ (bool) | ❌ | ❌ |
-| CNH | ❌ | ✅ | ❌ |
-
-> **Nota:** Slug, TaxaPlataforma e Gratuito são propriedades específicas do Perfil Gerente. CNH é específica do Perfil Motorista. O **login** (Email + Senha) está no **Usuario**, não no Perfil.
+> **Factory methods:** A criação é feita via métodos estáticos na própria entidade:
+> - `Usuario.CriarPassageiro(nome, cpf, email, senhaHash, telefone)` → Tipo = Passageiro
+> - `Usuario.CriarGerente(nome, cpf, email, senhaHash, telefone, slug, taxaPlataforma, gratuito, chavePix)` → Tipo = Gerente
+> - `Usuario.CriarMotorista(nome, cpf, telefone, cnh, criadoPorUsuarioId)` → Tipo = Motorista (Email=null, SenhaHash=null)
+> - `Usuario.CriarAdmin(nome, cpf, email, senhaHash)` → Tipo = Admin
+> - `usuario.UpgradeParaGerente(slug, taxaPlataforma, gratuito, chavePix)` — Passageiro vira Gerente (irreversível)
+>
+> **Motorista sem login:** Quando o Gerente cadastra um Motorista, o sistema cria um Usuario com `Email = null`, `SenhaHash = null`, `Tipo = Motorista`, e `CriadoPorUsuarioId = gerenteId`. Este Usuario não pode fazer login até que a pessoa se registre como Passageiro (mesmo CPF) e defina email + senha. Nesse momento, o sistema ativa a conta e altera o Tipo para Passageiro (perde o vínculo como Motorista daquele gerente).
+>
+> **Upgrade de Passageiro para Gerente:** Um Passageiro existente pode se tornar Gerente via `UpgradeParaGerente()`. O Tipo muda de Passageiro para Gerente de forma irreversível. Slug, TaxaPlataforma, Gratuito e ChavePix são definidos neste momento.
 
 #### Van
 
 | Propriedade | Tipo | Descrição |
 |-------------|------|-----------|
 | Id | Guid | Chave primária |
-| GerentePerfilId | Guid | FK → Perfil.Id (Tipo=Gerente) — dono da van |
+| GerenteUsuarioId | Guid | FK → Usuario.Id (Tipo=Gerente) — dono da van |
 | Nome | string | Nome/identificação |
 | Placa | Placa | Value Object — formato Mercosul |
 | Modelo | string | Modelo |
@@ -116,7 +108,7 @@ erDiagram
 | Propriedade | Tipo | Descrição |
 |-------------|------|-----------|
 | Id | Guid | Chave primária |
-| GerentePerfilId | Guid | FK → Perfil.Id (Tipo=Gerente) |
+| GerenteUsuarioId | Guid | FK → Usuario.Id (Tipo=Gerente) |
 | NomeEvento | string | Nome do evento |
 | DataEvento | DateTime | Data/hora do evento |
 | LocalEvento | string | Local do evento |
@@ -134,19 +126,13 @@ erDiagram
 | Id | Guid | Chave primária |
 | ViagemId | Guid | FK → Viagem |
 | VanId | Guid | FK → Van |
-| MotoristaPerfilId | Guid? | FK → Perfil.Id (Tipo=Motorista, opcional, alocado posteriormente) |
+| MotoristaUsuarioId | Guid? | FK → Usuario.Id (Tipo=Motorista, opcional, alocado posteriormente) |
 
 > **Assentos Virtuais:** A capacidade de assentos é derivada diretamente de `Van.Capacidade` (ex: 16 = 15 assentos + motorista). Não existem registros previamente criados de assentos. A disponibilidade é calculada subtraindo os `ItemReserva.NumeroAssento` já registrados para aquela `ViagemVan` do total de assentos disponíveis (`Van.Capacidade - 1`). O usuário escolhe o número do assento no momento da reserva, e o sistema valida se ele já está ocupado por outro `ItemReserva`.
 
-#### Perfil Motorista (Driver)
+#### Motorista (Driver)
 
-> O Motorista é um **Perfil** (Tipo=Motorista) vinculado a um Usuario. Quando o Gerente cadastra o Motorista, o Usuario é criado com `Email = null` e `SenhaHash = null` — o Motorista **não possui login inicialmente**. A pessoa pode depois **ativar a conta** registrando-se como Passageiro com o mesmo CPF (define email + senha). As propriedades abaixo são os dados específicos do perfil Motorista — Nome, CPF e Telefone estão no Usuario.
-
-| Propriedade | Específica do Perfil Motorista | Descrição |
-|-------------|-------------------------------|-----------|
-| CNH | string | Número da CNH |
-| Ativo | bool | Se ainda trabalha com o gerente |
-| CriadoPorPerfilId | Guid | FK → Perfil.Id do Gerente que cadastrou |
+> O Motorista é um **Usuario** com `Tipo = Motorista`. Quando o Gerente cadastra o Motorista, o Usuario é criado via `Usuario.CriarMotorista(nome, cpf, telefone, cnh, criadoPorUsuarioId)` com `Email = null` e `SenhaHash = null` — o Motorista **não possui login inicialmente**. A pessoa pode depois **ativar a conta** registrando-se com o mesmo CPF (define email + senha). Nesse momento, o Email e SenhaHash são preenchidos, o Tipo permanece `Motorista`, e ele pode fazer login e reservar assentos normalmente. Propriedades específicas do Motorista (CNH) estão diretamente no Usuario.
 
 #### Reserva (Reservation)
 
@@ -232,7 +218,7 @@ Value Objects no domínio, definidos em `VanBora.Domain/ValueObjects/`:
 ### 2.4. Enums
 
 ```csharp
-public enum TipoPerfil
+public enum TipoUsuario
 {
     Passageiro,
     Gerente,
@@ -264,27 +250,26 @@ public enum StatusReserva
 
 ## 3. Endpoints da API
 
-### 3.1. Autenticação e Perfil
+### 3.1. Autenticação
 
-> **Modelo:** Login único com Email + Senha do **Usuario**. Perfis (Passageiro, Gerente, Admin) definem capacidades. Qualquer usuário logado pode reservar assentos.
+> **Modelo:** Login único com Email + Senha do **Usuario**. O `TipoUsuario` (Passageiro, Gerente, Admin) determina as capacidades. Qualquer usuário logado pode reservar assentos. Não existe mais entidade Perfil — o Tipo está diretamente no Usuario.
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| POST | `/api/auth/registrar` | Criar Usuario + Perfil Passageiro (cadastro simples) |
+| POST | `/api/auth/registrar` | Criar Usuario como Passageiro (cadastro simples) |
 | POST | `/api/auth/login` | Login único (email + senha do Usuario) |
-| POST | `/api/auth/gerente/registrar` | Criar Perfil Gerente (cria Usuario se CPF não existir, ou adiciona a Usuario existente) |
-| GET | `/api/auth/me` | Dados do usuario logado + lista de perfis |
+| POST | `/api/auth/gerente/registrar` | Criar Usuario como Gerente (ou fazer upgrade de Passageiro existente) |
+| GET | `/api/auth/me` | Dados do usuario logado + tipo |
 | PUT | `/api/auth/usuario` | Atualizar dados do Usuario (nome, email, telefone) |
-| PUT | `/api/auth/perfil/gerente` | Atualizar Perfil Gerente (slug) |
 | POST | `/api/auth/alterar-senha` | Alterar senha do Usuario |
 | POST | `/api/auth/solicitar-exclusao` | Solicitar exclusão de conta (envia código por email) |
 | POST | `/api/auth/confirmar-exclusao` | Confirmar exclusão da conta com código recebido |
 
 > **Fluxo de cadastro:**
-> - `POST /api/auth/registrar` → Recebe: `{ nome, email, cpf, telefone, senha }` → Cria Usuario + Perfil Passageiro automaticamente. Usuário já pode reservar assentos.
-> - `POST /api/auth/gerente/registrar` → Recebe: `{ nome, email, cpf, telefone, senha, slug }` → Se CPF não existir, cria Usuario + Perfil Passageiro + Perfil Gerente. Se CPF já existir (ex: já é Passageiro), adiciona Perfil Gerente ao Usuario existente.
+> - `POST /api/auth/registrar` → Recebe: `{ nome, email, cpf, telefone, senha }` → Cria Usuario `Tipo = Passageiro` via `Usuario.CriarPassageiro()`. Usuário já pode reservar assentos.
+> - `POST /api/auth/gerente/registrar` → Recebe: `{ nome, email, cpf, telefone, senha, slug, chavePix? }` → Se CPF não existir, cria Usuario `Tipo = Gerente`. Se CPF já existir como Passageiro, faz `UpgradeParaGerente()` — o Tipo muda para Gerente **de forma irreversível**.
 > - Motorista é cadastrado via endpoint de Gerente (seção 3.4)
-> - **Login único:** Ambos os perfis usam o mesmo email e senha do Usuario para acessar o sistema.
+> - **Login único:** O email e senha do Usuario são usados para acessar o sistema. O JWT contém o TipoUsuario como claim "tipos".
 
 ### 3.2. Viagens — Público
 
@@ -308,11 +293,11 @@ public enum StatusReserva
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/api/gerente/motoristas` | Listar motoristas do gerente |
-| POST | `/api/gerente/motoristas` | Cadastrar motorista (busca Usuario por CPF ou cria + cria Perfil Motorista) |
+| POST | `/api/gerente/motoristas` | Cadastrar motorista (cria Usuario Tipo=Motorista com Email=null via factory method) |
 | PUT | `/api/gerente/motoristas/{id}` | Atualizar dados do motorista |
 | DELETE | `/api/gerente/motoristas/{id}` | Remover motorista |
 
-> **Cadastro de Motorista:** O gerente informa CPF, Nome, Telefone, CNH. O sistema busca um Usuario existente com esse CPF. Se existir, cria Perfil Motorista vinculado a ele. Se não existir, cria um novo Usuario com `Email = null` e `SenhaHash = null` + Perfil Motorista. O Motorista **não possui login inicialmente**, mas pode depois **ativar a conta** registrando-se como Passageiro com o mesmo CPF.
+> **Cadastro de Motorista:** O gerente informa CPF, Nome, Telefone, CNH. O sistema cria um Usuario via `Usuario.CriarMotorista(nome, cpf, telefone, cnh, gerenteId)` com `Tipo = Motorista`, `Email = null` e `SenhaHash = null`. O Motorista **não possui login inicialmente**, mas pode depois **ativar a conta** registrando-se com o mesmo CPF (define email + senha). Nesse momento, o Email e SenhaHash são preenchidos, o Tipo permanece Motorista, e ele pode fazer login e reservar assentos normalmente.
 
 ### 3.5. Gerente — Gestão de Viagens
 
@@ -352,7 +337,6 @@ public enum StatusReserva
 | GET | `/api/admin/usuarios` | Listar usuarios |
 | GET | `/api/admin/usuarios?search=termo` | Buscar usuario por nome ou CPF |
 | GET | `/api/admin/usuarios/{id}/reservas` | Histórico de reservas de um usuario |
-| GET | `/api/admin/usuarios/{id}/perfis` | Listar perfis de um usuario |
 
 ---
 
@@ -409,15 +393,13 @@ sequenceDiagram
     
     U->>API: POST /api/auth/login\n{ email, senha }
     API->>DB: Buscar Usuario com Email + Senha válidos
-    DB-->>API: Usuario encontrado
-    API->>DB: Buscar perfis do Usuario
-    DB-->>API: Lista de perfis [Passageiro, Gerente]
+    DB-->>API: Usuario encontrado (Tipo = Gerente)
     
-    Note over API: JWT claims:\nsub = UsuarioId\nemail = email_do_usuario\nperfis = [Passageiro, Gerente]\nnome = Nome do Usuario
+    Note over API: JWT claims:\nsub = UsuarioId\nemail = email_do_usuario\ntipos = Gerente\nnome = Nome do Usuario
     
-    API-->>U: JWT + lista de perfis disponíveis
+    API-->>U: JWT + TipoUsuario
     
-    Note over U: Único login para todos os perfis.\nQualquer usuario logado pode reservar.\nOperações de Gerente usam perfil_id no header.
+    Note over U: Login único.\nTipoUsuario determina capacidades.\nQualquer usuario logado pode reservar.
 ```
 
 ---
@@ -455,7 +437,6 @@ VanBora.sln
 ├── VanBora.Domain/
 │   ├── Entities/
 │   │   ├── Usuario.cs
-│   │   ├── Perfil.cs
 │   │   ├── Van.cs
 │   │   ├── Viagem.cs
 │   │   ├── ViagemVan.cs
@@ -466,14 +447,14 @@ VanBora.sln
 │   │   ├── CPF.cs
 │   │   ├── Telefone.cs
 │   │   ├── Placa.cs
+│   │   └── CNH.cs
 │   │   └── Dinheiro.cs
 │   ├── Enums/
-│   │   ├── TipoPerfil.cs
+│   │   ├── TipoUsuario.cs
 │   │   ├── StatusViagem.cs
 │   │   └── StatusReserva.cs
 │   └── Interfaces/
 │       ├── IUsuarioRepository.cs
-│       ├── IPerfilRepository.cs
 │       ├── IVanRepository.cs
 │       ├── IViagemRepository.cs
 │       ├── IViagemVanRepository.cs
@@ -493,23 +474,26 @@ VanBora.sln
         └── ServiceCollectionExtensions.cs
 ```
 
-> **Mudanças na estrutura:**
-> - Removido: `Gerente.cs`, `Motorista.cs` (substituídos por Perfil.cs com TipoPerfil)
-> - Removido: `IGerenteRepository.cs`, `IMotoristaRepository.cs` (substituídos por IPerfilRepository.cs)
-> - Adicionado: `Usuario.cs` (unificado), `Perfil.cs`, `TipoPerfil.cs`
-> - Adicionado: `Admin/UsuariosController.cs`
-> - Renomeado: `AuthService` agora lida com Perfis, não entidades separadas
+> **Mudanças na estrutura (vs modelo anterior com Perfil separado):**
+> - **Removido:** `Perfil.cs`, `TipoPerfil.cs`, `IPerfilRepository.cs`, `PerfilRepository.cs`, `PerfilConfiguration.cs`, `PerfilService.cs`, `IPerfilService.cs` — entidade Perfil eliminada
+> - **Unificado:** Todos os atributos movidos para `Usuario.cs` (Tipo, Slug, TaxaPlataforma, Gratuito, ChavePix, CNH, CriadoPorUsuarioId)
+> - **Adicionado:** `TipoUsuario.cs` (enum), `CNH.cs` (Value Object), auto-relacionamento `CriadoPorUsuarioId` em Usuario
+> - **Factory methods:** `CriarPassageiro()`, `CriarGerente()`, `CriarMotorista()`, `CriarAdmin()`, `UpgradeParaGerente()`
+> - **FK renomeadas:** `Van.GerentePerfilId` → `GerenteUsuarioId`, `Viagem.GerentePerfilId` → `GerenteUsuarioId`, `ViagemVan.MotoristaPerfilId` → `MotoristaUsuarioId`
+> - **Claims JWT:** `"perfis"` → `"tipos"` (valor único do TipoUsuario)
 >
 > **Decisões de implementação:**
-> - **Login único:** Email + Senha no Usuario. Todos os perfis compartilham o mesmo login
-> - **Reserva para todos:** Qualquer usuário logado pode reservar assentos, independente do tipo de perfil (Passageiro, Gerente, Admin)
-> - **CPF:** Todos os cadastros (Passageiro, Gerente, Motorista) reutilizam Usuario existente pelo CPF
-> - **Soft delete:** Todas as exclusões são lógicas (Ativo = false), nunca exclusão física
-> - **0800:** Primeiros 2 gerentes do sistema recebem gratuito = true automaticamente; Admin pode ajustar taxas individualmente via `PUT /api/admin/gerentes/{id}`
-> - **Reembolso:** Automático via Pix quando gerente cancela viagem ou remove van com reservas
-> - **Capacidade da van:** Imutável após criação, sem exceções
-> - **Ingresso:** VanBora apenas exibe o contato do gerente (WhatsApp/telefone) para o passageiro quando `PossuiIngresso = true`. Toda negociação e compra do ingresso é feita diretamente entre passageiro e gerente, fora da plataforma
-> - **Pagamento:** Apenas o assento é pago via Pix VanBora. Ingresso é tratado externamente
+> - **Tipo único:** Cada Usuario tem exatamente um `TipoUsuario`. Não existem múltiplos perfis por usuário.
+> - **Upgrade irreversível:** Passageiro pode virar Gerente via `UpgradeParaGerente()`. O Tipo muda permanentemente.
+> - **Login único:** Email + Senha no Usuario. O JWT contém `tipos = [TipoUsuario]`.
+> - **Reserva para todos:** Qualquer usuário logado pode reservar assentos, independente do TipoUsuario.
+> - **CPF:** Todos os cadastros (Passageiro, Gerente, Motorista) usam CPF como identificador único.
+> - **Soft delete:** Todas as exclusões são lógicas (Ativo = false), nunca exclusão física.
+> - **0800:** Primeiros 2 gerentes do sistema recebem gratuito = true automaticamente; Admin pode ajustar taxas individualmente.
+> - **Reembolso:** Automático via Pix quando gerente cancela viagem ou remove van com reservas.
+> - **Capacidade da van:** Imutável após criação, sem exceções.
+> - **Ingresso:** VanBora apenas exibe o contato do gerente (WhatsApp/telefone) quando `PossuiIngresso = true`.
+> - **Pagamento:** Apenas o assento é pago via Pix VanBora. Ingresso é tratado externamente.
 
 ---
 
@@ -666,11 +650,11 @@ public class ReservaService
 
 | # | US/Task | SP | Responsável | Sub-tasks (arquivos a criar) |
 |---|---------|----|-------------|------------------------------|
-| 1.1 | **Setup técnico** | 5 | **Dev 1** | `Domain/ValueObjects/Email.cs`, `CPF.cs`, `Telefone.cs`, `Placa.cs`, `Dinheiro.cs`; `Domain/Enums/TipoPerfil.cs`, `StatusViagem.cs`, `StatusReserva.cs`; `Domain/Entities/Usuario.cs`, `Perfil.cs`, `Van.cs`, `Viagem.cs`, `ViagemVan.cs`, `Reserva.cs`, `ItemReserva.cs`; `Domain/Interfaces/I*.cs` (todos os repositórios + IUnitOfWork) |
+| 1.1 | **Setup técnico** | 5 | **Dev 1** | `Domain/ValueObjects/Email.cs`, `CPF.cs`, `Telefone.cs`, `Placa.cs`, `Dinheiro.cs`, `CNH.cs`; `Domain/Enums/TipoUsuario.cs`, `StatusViagem.cs`, `StatusReserva.cs`; `Domain/Entities/Usuario.cs`, `Van.cs`, `Viagem.cs`, `ViagemVan.cs`, `Reserva.cs`, `ItemReserva.cs`; `Domain/Interfaces/I*.cs` (todos os repositórios + IUnitOfWork) |
 | 1.2a | **Result Pattern** | 2 | **Dev 1** | `Domain/Common/Result.cs`, `Error.cs`, `ErrorType.cs` |
 | 1.2b | **ResultMiddleware** (conversão Result → HTTP) | 1 | **Dev 1** | `Api/Middleware/ResultMiddleware.cs` |
 | 1.2c | **ExceptionMiddleware** (exceções inesperadas → 500) | 1 | **Dev 1** | `Api/Middleware/ExceptionMiddleware.cs` |
-| 1.3 | **US03 — Cadastro Passageiro** | 8 | **Dev 2** | `Application/DTOs/Auth/RegistrarRequest.cs`, `RegistrarResponse.cs`; `Application/Services/AuthService.cs` (método Registrar); `Application/Validators/RegistrarValidator.cs`; `Infrastructure/Data/AppDbContext.cs`, `Configurations/UsuarioConfiguration.cs`, `PerfilConfiguration.cs`; `Infrastructure/Repositories/UsuarioRepository.cs`, `PerfilRepository.cs`, `UnitOfWork.cs`; `Api/Controllers/AuthController.cs` (POST /api/auth/registrar) |
+| 1.3 | **US03 — Cadastro Passageiro** | 8 | **Dev 2** | `Application/DTOs/Auth/RegistrarPassageiroRequest.cs`, `RegistrarPassageiroResponse.cs`; `Application/Services/AuthService.cs` (método RegistrarPassageiroAsync); `Application/Validators/RegistrarPassageiroRequestValidator.cs`; `Infrastructure/Data/AppDbContext.cs`, `Configurations/UsuarioConfiguration.cs`; `Infrastructure/Repositories/UsuarioRepository.cs`, `UnitOfWork.cs`; `Api/Controllers/AuthController.cs` (POST /api/auth/registrar) |
 | 1.4 | **US01 — Cadastro Gerente** | 8 | **Dev 3** | `Application/DTOs/Auth/RegistrarGerenteRequest.cs`, `RegistrarGerenteResponse.cs`; `Application/Services/AuthService.cs` (método RegistrarGerente); `Application/Validators/RegistrarGerenteValidator.cs`; `Application/Services/AuthService.cs` (método Login); `Api/Controllers/AuthController.cs` (POST /api/auth/gerente/registrar, POST /api/auth/login); `Application/Mappings/AuthProfile.cs` (AutoMapper); `Infrastructure/Extensions/ServiceCollectionExtensions.cs` (DI) |
 | 1.5 | **US02+US04 — Login** | 3 | **Dev 3** | JWT config em `Api/Program.cs`; `Api/appsettings.json` (JWT Secret, expiração) |
 
@@ -722,17 +706,17 @@ public class ReservaService
 **Objetivo:** Gestão de conta do usuário, administração do sistema, e cadastro/alocação de motoristas.
 
 **Dependências:** Sprint 1 (precisa de auth), Sprint 3 (precisa de reservas para histórico)
-**Definition of Done:** Alteração de senha, desativação de conta com código email, soft delete de perfil, CRUD admin completo, cadastro de motorista com/sem CPF existente, alocação de motorista em viagem.
+**Definition of Done:** Alteração de senha, desativação de conta com código email, soft delete de conta, CRUD admin completo, cadastro de motorista com/sem CPF existente, alocação de motorista em viagem.
 
 | # | US/Task | SP | Responsável | Sub-tasks |
 |---|---------|----|-------------|-----------|
 | 4.1 | **US21 — Alterar Senha** | 2 | **Dev 1** | `Application/DTOs/Auth/AlterarSenhaRequest.cs`; `Application/Services/AuthService.cs` (AlterarSenha); `Api/Controllers/AuthController.cs` (POST /api/auth/alterar-senha) |
-| 4.2 | **US19 — Atualizar Perfil Gerente** | 2 | **Dev 1** | `Application/DTOs/Auth/AtualizarPerfilGerenteRequest.cs`; `Application/Services/AuthService.cs` (AtualizarPerfilGerente); `Api/Controllers/AuthController.cs` (PUT /api/auth/perfil/gerente); Regra: slug único |
+| 4.2 | **US19 — Atualizar Slug do Gerente** | 2 | **Dev 1** | `Application/Services/AuthService.cs` (AtualizarSlug — altera `Usuario.Slug`); Regra: slug único via `IUsuarioRepository.GetBySlugAsync()` |
 | 4.3 | **US20 — Desativar Conta** | 5 | **Dev 1** | `Application/Services/AuthService.cs` (SolicitarExclusao — gera código, envia email; ConfirmarExclusao — valida código, soft delete); `Api/Controllers/AuthController.cs` (POST /api/auth/solicitar-exclusao, POST /api/auth/confirmar-exclusao); Regra: gerente com reservas ativas não pode desativar |
 | 4.4 | **US13 — Admin: Gerenciar Gerentes** | 5 | **Dev 2** | `Application/DTOs/Admin/GerenteResponse.cs`, `AtualizarGerenteRequest.cs`; `Application/Services/AdminService.cs` (CRUD gerentes); `Api/Controllers/Admin/GerentesController.cs`; Regra: taxa alterada só afeta novas reservas |
 | 4.5 | **US22 — Admin: Buscar Usuarios** | 3 | **Dev 2** | `Application/DTOs/Admin/UsuarioResponse.cs`; `Application/Services/AdminService.cs` (BuscarUsuarios); `Api/Controllers/Admin/UsuariosController.cs` (GET /api/admin/usuarios?search=); GET /api/admin/usuarios/{id}/perfis |
 | 4.6 | **US23 — Admin: Histórico Reservas** | 3 | **Dev 2** | `Application/DTOs/Admin/ReservaHistoricoResponse.cs`; `Application/Services/AdminService.cs` (HistoricoReservasUsuario, HistoricoReservasGerente); `Api/Controllers/Admin/UsuariosController.cs` (GET .../reservas); `Api/Controllers/Admin/GerentesController.cs` (GET .../reservas) |
-| 4.7 | **US24 — Cadastrar Motorista** | 5 | **Dev 3** | `Application/DTOs/Motoristas/CriarMotoristaRequest.cs`, `MotoristaResponse.cs`; `Application/Services/MotoristaService.cs` (CRUD); `Application/Validators/CriarMotoristaValidator.cs`; `Infrastructure/Repositories/PerfilRepository.cs` (já existe); `Api/Controllers/Gerente/MotoristasController.cs`; Regra: busca Usuario por CPF, cria com SenhaHash=null se não existir |
+| 4.7 | **US24 — Cadastrar Motorista** | 5 | **Dev 3** | `Application/DTOs/Motoristas/CriarMotoristaRequest.cs`, `MotoristaResponse.cs`; `Application/Services/MotoristaService.cs` (CRUD); `Application/Validators/CriarMotoristaValidator.cs`; `Infrastructure/Repositories/UsuarioRepository.cs`; `Api/Controllers/Gerente/MotoristasController.cs`; Regra: cria Usuario via `Usuario.CriarMotorista()` com Email=null |
 | 4.8 | **US25 — Alocar Motorista** | 3 | **Dev 3** | `Application/Services/ViagemService.cs` (AlocarMotorista, DesalocarMotorista); `Api/Controllers/Gerente/ViagensController.cs` (POST alocar-motorista); Regra: motorista inativo ou de outro gerente → erro |
 
 > **Sprint Review:** Demo de alterar senha, desativar conta, admin buscando usuarios/gerentes, cadastrar motorista, alocar motorista em viagem.
@@ -804,7 +788,7 @@ graph LR
 | 16 | US12 | Relatório Financeiro | 3 | Sprint 3 | US09 |
 | 17 | US18 | Atualizar Usuario | 2 | Sprint 3 | US01/US03 |
 | 18 | US21 | Alterar Senha | 2 | Sprint 4 | US01/US03 |
-| 19 | US19 | Atualizar Perfil Gerente | 2 | Sprint 4 | US01 |
+| 19 | US19 | Atualizar Slug do Gerente | 2 | Sprint 4 | US01 |
 | 20 | US20 | Desativar Conta | 5 | Sprint 4 | US01/US03 |
 | 21 | US13 | Admin: Gerenciar Gerentes | 5 | Sprint 4 | US01 |
 | 22 | US22 | Admin: Buscar Usuarios | 3 | Sprint 4 | US01/US03 |
@@ -824,13 +808,14 @@ O JWT conterá as seguintes claims:
 {
   "sub": "guid-do-usuario",
   "email": "email-do-usuario",
-  "perfis": ["Passageiro", "Gerente"],
+  "tipos": "Gerente",
   "nome": "João Silva"
 }
 ```
 
-- O login é feito com email + senha do **Usuario** (único para todos os perfis)
-- O JWT lista todos os perfis que o usuário possui
+- O login é feito com email + senha do **Usuario** (conta única)
+- O JWT contém o `TipoUsuario` como string no claim `"tipos"` (valor único, não lista)
 - Qualquer usuário logado pode acessar endpoints de reserva (não precisa ser Passageiro)
-- Endpoints de Gerente (criar viagens, gerenciar vans) exigem que o usuário tenha Perfil Gerente e informem o `perfil_id` no header da requisição
-- Para usuários com múltiplos Perfis Gerente, o header `X-Perfil-Id` define qual gerente está sendo usado
+- Endpoints de Gerente (criar viagens, gerenciar vans) exigem que `TipoUsuario == Gerente`
+- A verificação de tipo é feita via `ClaimsHelper.ObterTipos()` e `ClaimsHelper.TemTipo()`
+- Não existe mais o conceito de múltiplos perfis por usuário — cada usuário tem exatamente um `TipoUsuario`

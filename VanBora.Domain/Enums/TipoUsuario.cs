@@ -1,6 +1,6 @@
 namespace VanBora.Domain.Enums;
 
-public enum TipoPerfil
+public enum TipoUsuario
 {
     Passageiro,
     Gerente,

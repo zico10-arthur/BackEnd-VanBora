@@ -1,5 +1,4 @@
 using VanBora.Domain.Common;
-using VanBora.Domain.Enums;
 using VanBora.Domain.ValueObjects;
 
 namespace VanBora.Domain.Entities;
@@ -7,7 +6,7 @@ namespace VanBora.Domain.Entities;
 public class Van
 {
     public Guid Id { get; private set; }
-    public Guid GerentePerfilId { get; private set; }
+    public Guid GerenteUsuarioId { get; private set; }
     public string Nome { get; private set; }
     public Placa Placa { get; private set; }
     public string Modelo { get; private set; }
@@ -16,7 +15,7 @@ public class Van
     public DateTime CriadoEm { get; private set; }
 
     // Navigation properties
-    public Perfil GerentePerfil { get; private set; } = null!;
+    public Usuario GerenteUsuario { get; private set; } = null!;
     private readonly List<ViagemVan> _viagemVans = [];
     public IReadOnlyCollection<ViagemVan> ViagemVans => _viagemVans.AsReadOnly();
 
@@ -24,21 +23,16 @@ public class Van
     private Van() { }
 #pragma warning restore CS8618
 
-    public Van(Perfil gerentePerfil, string nome, Placa placa, string modelo, int capacidade)
+    public Van(Guid gerenteUsuarioId, string nome, Placa placa, string modelo, int capacidade)
     {
-        Guard.AgainstNull(gerentePerfil, nameof(gerentePerfil));
-        Guard.AgainstInvalidState(
-            gerentePerfil.Tipo == TipoPerfil.Gerente,
-            "Apenas perfis do tipo Gerente podem possuir vans.");
-
+        Guard.AgainstEmptyGuid(gerenteUsuarioId, nameof(gerenteUsuarioId));
         Guard.AgainstNullOrWhiteSpace(nome, nameof(nome));
         Guard.AgainstNull(placa, nameof(placa));
         Guard.AgainstNullOrWhiteSpace(modelo, nameof(modelo));
         Guard.AgainstLessThan(capacidade, 2, nameof(capacidade)); // mínimo: 1 motorista + 1 passageiro
 
         Id = Guid.NewGuid();
-        GerentePerfilId = gerentePerfil.Id;
-        GerentePerfil = gerentePerfil;
+        GerenteUsuarioId = gerenteUsuarioId;
         Nome = nome;
         Placa = placa;
         Modelo = modelo;

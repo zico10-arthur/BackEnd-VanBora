@@ -22,7 +22,7 @@ namespace VanBora.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("VanBora.Domain.Entities.Perfil", b =>
+            modelBuilder.Entity("VanBora.Domain.Entities.Usuario", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -34,17 +34,37 @@ namespace VanBora.Infrastructure.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("ativo");
 
+                    b.Property<string>("ChavePix")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("chave_pix");
+
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("criado_em");
 
-                    b.Property<Guid?>("CriadoPorPerfilId")
+                    b.Property<Guid?>("CriadoPorUsuarioId")
                         .HasColumnType("uuid")
-                        .HasColumnName("criado_por_perfil_id");
+                        .HasColumnName("criado_por_usuario_id");
+
+                    b.Property<DateTime?>("DataAtualizacao")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("data_atualizacao");
 
                     b.Property<bool?>("Gratuito")
                         .HasColumnType("boolean")
                         .HasColumnName("gratuito");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("nome");
+
+                    b.Property<string>("SenhaHash")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("senha_hash");
 
                     b.Property<string>("Slug")
                         .HasMaxLength(100)
@@ -62,73 +82,28 @@ namespace VanBora.Infrastructure.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("tipo");
 
-                    b.Property<Guid>("UsuarioId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("usuario_id");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("CriadoPorPerfilId");
+                    b.HasIndex("CriadoPorUsuarioId");
 
                     b.HasIndex("Slug")
                         .IsUnique()
-                        .HasDatabaseName("ix_perfis_slug")
+                        .HasDatabaseName("ix_usuarios_slug")
                         .HasFilter("\"slug\" IS NOT NULL");
-
-                    b.HasIndex("UsuarioId")
-                        .HasDatabaseName("ix_perfis_usuario_id");
-
-                    b.ToTable("perfis", (string)null);
-                });
-
-            modelBuilder.Entity("VanBora.Domain.Entities.Usuario", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<bool>("Ativo")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("ativo");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("criado_em");
-
-                    b.Property<string>("Nome")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("nome");
-
-                    b.Property<string>("SenhaHash")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("senha_hash");
-
-                    b.HasKey("Id");
 
                     b.ToTable("usuarios", (string)null);
                 });
 
-            modelBuilder.Entity("VanBora.Domain.Entities.Perfil", b =>
+            modelBuilder.Entity("VanBora.Domain.Entities.Usuario", b =>
                 {
-                    b.HasOne("VanBora.Domain.Entities.Perfil", "CriadoPorPerfil")
-                        .WithMany("MotoristasCriados")
-                        .HasForeignKey("CriadoPorPerfilId")
+                    b.HasOne("VanBora.Domain.Entities.Usuario", "CriadoPorUsuario")
+                        .WithMany()
+                        .HasForeignKey("CriadoPorUsuarioId")
                         .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("VanBora.Domain.Entities.Usuario", "Usuario")
-                        .WithMany("Perfis")
-                        .HasForeignKey("UsuarioId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
 
                     b.OwnsOne("VanBora.Domain.ValueObjects.CNH", "CNH", b1 =>
                         {
-                            b1.Property<Guid>("PerfilId")
+                            b1.Property<Guid>("UsuarioId")
                                 .HasColumnType("uuid");
 
                             b1.Property<string>("Valor")
@@ -137,23 +112,14 @@ namespace VanBora.Infrastructure.Migrations
                                 .HasColumnType("character varying(11)")
                                 .HasColumnName("cnh");
 
-                            b1.HasKey("PerfilId");
+                            b1.HasKey("UsuarioId");
 
-                            b1.ToTable("perfis");
+                            b1.ToTable("usuarios");
 
                             b1.WithOwner()
-                                .HasForeignKey("PerfilId");
+                                .HasForeignKey("UsuarioId");
                         });
 
-                    b.Navigation("CNH");
-
-                    b.Navigation("CriadoPorPerfil");
-
-                    b.Navigation("Usuario");
-                });
-
-            modelBuilder.Entity("VanBora.Domain.Entities.Usuario", b =>
-                {
                     b.OwnsOne("VanBora.Domain.ValueObjects.CPF", "CPF", b1 =>
                         {
                             b1.Property<Guid>("UsuarioId")
@@ -226,22 +192,16 @@ namespace VanBora.Infrastructure.Migrations
                                 .HasForeignKey("UsuarioId");
                         });
 
+                    b.Navigation("CNH");
+
                     b.Navigation("CPF")
                         .IsRequired();
+
+                    b.Navigation("CriadoPorUsuario");
 
                     b.Navigation("Email");
 
                     b.Navigation("Telefone");
-                });
-
-            modelBuilder.Entity("VanBora.Domain.Entities.Perfil", b =>
-                {
-                    b.Navigation("MotoristasCriados");
-                });
-
-            modelBuilder.Entity("VanBora.Domain.Entities.Usuario", b =>
-                {
-                    b.Navigation("Perfis");
                 });
 #pragma warning restore 612, 618
         }

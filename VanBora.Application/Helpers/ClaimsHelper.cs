@@ -5,17 +5,17 @@ namespace VanBora.Application.Helpers;
 
 public static class ClaimsHelper
 {
-    public static List<string> ObterPerfis(ClaimsPrincipal user)
+    public static List<string> ObterTipos(ClaimsPrincipal user)
     {
-        var perfisClaim = user.FindFirst("perfis")?.Value;
-        if (string.IsNullOrWhiteSpace(perfisClaim))
+        var tiposClaim = user.FindFirst("tipos")?.Value;
+        if (string.IsNullOrWhiteSpace(tiposClaim))
             return [];
 
-        return JsonSerializer.Deserialize<List<string>>(perfisClaim) ?? [];
+        return JsonSerializer.Deserialize<List<string>>(tiposClaim) ?? [];
     }
 
-    public static bool TemPerfil(ClaimsPrincipal user, string perfil)
+    public static bool TemTipo(ClaimsPrincipal user, string tipo)
     {
-        return ObterPerfis(user).Contains(perfil, StringComparer.OrdinalIgnoreCase);
+        return ObterTipos(user).Contains(tipo, StringComparer.OrdinalIgnoreCase);
     }
 }

@@ -11,20 +11,17 @@ namespace VanBora.Application.Services;
 public class LoginService : ILoginService
 {
     private readonly IUsuarioRepository _usuarioRepo;
-    private readonly IPerfilService _perfilService;
     private readonly IValidator<LoginRequest> _loginValidator;
 
     public LoginService(
         IUsuarioRepository usuarioRepo,
-        IPerfilService perfilService,
         IValidator<LoginRequest> loginValidator)
     {
         _usuarioRepo = usuarioRepo;
-        _perfilService = perfilService;
         _loginValidator = loginValidator;
     }
 
-    public async Task<Result<(Usuario usuario, List<string> perfisAtivos)>> LoginAsync(
+    public async Task<Result<(Usuario usuario, List<string> tipos)>> LoginAsync(
         LoginRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -48,9 +45,10 @@ public class LoginService : ILoginService
         if (!BCrypt.Net.BCrypt.Verify(request.Senha, usuario.SenhaHash))
             return Error.Unauthorized("CREDENCIAIS_INVALIDAS", "Email ou senha inválidos");
 
-        var perfisAtivos = await _perfilService.BuscarPerfisAtivosAsync(usuario.Id, cancellationToken);
+        // O tipo do usuário agora está diretamente no Usuario (único tipo)
+        var tipos = new List<string> { usuario.Tipo.ToString() };
 
-        return Result<(Usuario, List<string>)>.Success((usuario, perfisAtivos));
+        return Result<(Usuario, List<string>)>.Success((usuario, tipos));
     }
 
     private static Error? VerificarEstadoConta(Usuario usuario)

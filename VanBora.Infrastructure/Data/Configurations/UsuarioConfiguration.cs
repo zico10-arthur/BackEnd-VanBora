@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using VanBora.Domain.Entities;
+using VanBora.Domain.Enums;
 
 namespace VanBora.Infrastructure.Data.Configurations;
 
@@ -69,10 +70,53 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
             .IsRequired()
             .HasColumnName("criado_em");
 
-        // Relacionamento 1:N com Perfil
-        builder.HasMany(u => u.Perfis)
-            .WithOne(p => p.Usuario)
-            .HasForeignKey(p => p.UsuarioId)
+        builder.Property(u => u.DataAtualizacao)
+            .HasColumnName("data_atualizacao");
+
+        // Tipo de usuário (Passageiro, Gerente, Motorista, Admin)
+        builder.Property(u => u.Tipo)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasColumnName("tipo");
+
+        // Campos específicos do Gerente
+        builder.Property(u => u.Slug)
+            .HasMaxLength(100)
+            .HasColumnName("slug");
+
+        builder.Property(u => u.TaxaPlataforma)
+            .HasPrecision(5, 2)
+            .HasColumnName("taxa_plataforma");
+
+        builder.Property(u => u.Gratuito)
+            .HasColumnName("gratuito");
+
+        builder.Property(u => u.ChavePix)
+            .HasMaxLength(100)
+            .HasColumnName("chave_pix");
+
+        // CNH (Value Object, específico do Motorista)
+        builder.OwnsOne(u => u.CNH, cnh =>
+        {
+            cnh.Property(c => c.Valor)
+                .HasMaxLength(11)
+                .HasColumnName("cnh");
+        });
+
+        // Auto-relacionamento: Gerente que criou o Motorista
+        builder.Property(u => u.CriadoPorUsuarioId)
+            .HasColumnName("criado_por_usuario_id");
+
+        builder.HasOne(u => u.CriadoPorUsuario)
+            .WithMany()
+            .HasForeignKey(u => u.CriadoPorUsuarioId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Índices
+        builder.HasIndex(u => u.Slug)
+            .HasDatabaseName("ix_usuarios_slug")
+            .IsUnique()
+            .HasFilter("\"slug\" IS NOT NULL");
     }
 }

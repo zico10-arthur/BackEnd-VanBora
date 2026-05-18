@@ -6,7 +6,7 @@ namespace VanBora.Application.Interfaces;
 
 public interface ILoginService
 {
-    Task<Result<(Usuario usuario, List<string> perfisAtivos)>> LoginAsync(
+    Task<Result<(Usuario usuario, List<string> tipos)>> LoginAsync(
         LoginRequest request,
         CancellationToken cancellationToken = default);
 }

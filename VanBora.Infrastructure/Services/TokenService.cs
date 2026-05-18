@@ -23,24 +23,20 @@ public class TokenService : ITokenService
     {
         ArgumentNullException.ThrowIfNull(usuario);
 
-        var perfis = usuario.Perfis
-            .Where(p => p.Ativo)
-            .Select(p => p.Tipo.ToString())
-            .ToList();
-
+        var tipo = usuario.Tipo.ToString();
         var email = usuario.Email?.Valor ?? string.Empty;
 
-        return GerarToken(usuario.Id, usuario.Nome, email, perfis);
+        return GerarToken(usuario.Id, usuario.Nome, email, [tipo]);
     }
 
-    public string GerarToken(Guid usuarioId, string nome, string email, List<string> perfis)
+    public string GerarToken(Guid usuarioId, string nome, string email, List<string> tipos)
     {
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, usuarioId.ToString()),
             new(JwtRegisteredClaimNames.Email, email),
             new(ClaimTypes.Name, nome),
-            new("perfis", JsonSerializer.Serialize(perfis))
+            new("tipos", JsonSerializer.Serialize(tipos))
         };
 
         var key = new SymmetricSecurityKey(
