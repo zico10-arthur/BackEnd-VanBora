@@ -7,16 +7,21 @@ public readonly struct Error
     public string Code { get; }
     public string Message { get; }
     public ErrorType Type { get; }
+    public IReadOnlyList<Error>? Errors { get; }
 
-    public Error(string code, string message, ErrorType type = ErrorType.Validation)
+    public Error(string code, string message, ErrorType type = ErrorType.Validation, IReadOnlyList<Error>? errors = null)
     {
         Code = code;
         Message = message;
         Type = type;
+        Errors = errors;
     }
 
     public static Error Validation(string code, string message) =>
         new(code, message, ErrorType.Validation);
+
+    public static Error Validation(IReadOnlyList<Error> errors) =>
+        new("VALIDATION_FAILED", "Um ou mais campos estão inválidos.", ErrorType.Validation, errors);
 
     public static Error NotFound(string code, string message) =>
         new(code, message, ErrorType.NotFound);
