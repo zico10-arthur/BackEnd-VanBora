@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using VanBora.Domain.Entities;
 using VanBora.Domain.Interfaces;
+using VanBora.Domain.ValueObjects;
 using VanBora.Infrastructure.Data;
 
 namespace VanBora.Infrastructure.Repositories;
@@ -35,6 +36,12 @@ public class VanRepository : IVanRepository
     {
         return await _context.Vans
             .FirstOrDefaultAsync(v => v.Id == id && v.GerenteUsuarioId == gerenteUsuarioId, cancellationToken);
+    }
+
+    public async Task<Van?> GetByPlacaAsync(Placa placa, CancellationToken cancellationToken = default)
+    {
+        return await _context.Vans
+            .FirstOrDefaultAsync(v => v.Placa.Valor == placa.Valor, cancellationToken);
     }
 
     public async Task AddAsync(Van van, CancellationToken cancellationToken = default)

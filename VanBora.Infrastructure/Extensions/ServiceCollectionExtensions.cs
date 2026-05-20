@@ -22,6 +22,9 @@ public static class ServiceCollectionExtensions
 
         // Repositories
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+        services.AddScoped<IVanRepository, VanRepository>();
+        services.AddScoped<IViagemRepository, ViagemRepository>();
+        services.AddScoped<IViagemVanRepository, ViagemVanRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Services

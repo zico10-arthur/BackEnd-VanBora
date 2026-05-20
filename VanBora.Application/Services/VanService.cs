@@ -69,11 +69,26 @@ public class VanService : IVanService
         if (van is null)
             return Result<VanResponse>.Failure(Error.NotFound("VAN_NAO_ENCONTRADA", "Van não encontrada."));
 
-        var placaResult = Placa.Criar(request.Placa);
-        if (!placaResult.IsSuccess)
-            return Result<VanResponse>.Failure(placaResult.Error);
+        // Só valida unicidade se a placa foi alterada (evita query desnecessária)
+        var placaMudou = !string.Equals(request.Placa, van.Placa.Valor, StringComparison.OrdinalIgnoreCase);
 
-        van.AtualizarDados(request.Nome, placaResult.Value, request.Modelo);
+        var novaPlaca = van.Placa; // mantém a placa atual por padrão
+
+        if (placaMudou)
+        {
+            var placaResult = Placa.Criar(request.Placa);
+            if (!placaResult.IsSuccess)
+                return Result<VanResponse>.Failure(placaResult.Error);
+
+            novaPlaca = placaResult.Value;
+
+            var vanComMesmaPlaca = await _vanRepository.GetByPlacaAsync(novaPlaca, cancellationToken);
+            if (vanComMesmaPlaca is not null)
+                return Result<VanResponse>.Failure(
+                    Error.Conflict("PLACA_EM_USO", "Esta placa já está cadastrada para outra van."));
+        }
+
+        van.AtualizarDados(request.Nome, novaPlaca, request.Modelo);
 
         _vanRepository.Update(van);
         await _vanRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
@@ -82,18 +97,35 @@ public class VanService : IVanService
         return Result<VanResponse>.Success(response);
     }
 
-    public Task<Result<VanResponse>> ObterPorIdAsync(Guid gerenteUsuarioId, Guid vanId, CancellationToken cancellationToken = default)
+    public async Task<Result<VanResponse>> ObterPorIdAsync(Guid gerenteUsuarioId, Guid vanId, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var van = await _vanRepository.GetByIdAndGerenteAsync(vanId, gerenteUsuarioId, cancellationToken);
+        if (van is null)
+            return Result<VanResponse>.Failure(Error.NotFound("VAN_NAO_ENCONTRADA", "Van não encontrada."));
+
+        var response = _mapper.Map<VanResponse>(van);
+        return Result<VanResponse>.Success(response);
     }
 
-    public Task<Result<List<VanResponse>>> ListarPorGerenteAsync(Guid gerenteUsuarioId, CancellationToken cancellationToken = default)
+    public async Task<Result<List<VanResponse>>> ListarPorGerenteAsync(Guid gerenteUsuarioId, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var vans = await _vanRepository.GetByGerenteUsuarioIdAsync(gerenteUsuarioId, cancellationToken);
+
+        var response = _mapper.Map<List<VanResponse>>(vans);
+        return Result<List<VanResponse>>.Success(response);
     }
 
-    public Task<Result<bool>> RemoverAsync(Guid gerenteUsuarioId, Guid vanId, CancellationToken cancellationToken = default)
+    public async Task<Result<bool>> RemoverAsync(Guid gerenteUsuarioId, Guid vanId, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var van = await _vanRepository.GetByIdAndGerenteAsync(vanId, gerenteUsuarioId, cancellationToken);
+        if (van is null)
+            return Result<bool>.Failure(Error.NotFound("VAN_NAO_ENCONTRADA", "Van não encontrada."));
+
+        van.Desativar();
+
+        _vanRepository.Update(van);
+        await _vanRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result<bool>.Success(true);
     }
 }
