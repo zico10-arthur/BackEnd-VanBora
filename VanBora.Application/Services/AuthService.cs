@@ -44,60 +44,24 @@ public class AuthService : IAuthService
         var erroValidacao = await ValidarRequestAsync(request, _gerenteValidator, cancellationToken);
         if (erroValidacao is not null) return erroValidacao;
 
-        await _unitOfWork.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            // Verifica se CPF já está em uso
-            var existentePorCpf = await _usuarioService
-                .BuscarPorCpfAsync(request.Cpf, cancellationToken)
-                .ConfigureAwait(false);
+        var slugNormalizado = request.Slug.Trim().ToLowerInvariant();
 
-            if (existentePorCpf is not null)
-                return Error.Conflict("CPF_JA_CADASTRADO", "CPF já cadastrado.");
+        // Guard: slug já em uso
+        if (await _usuarioRepo.GetBySlugAsync(slugNormalizado, cancellationToken) is not null)
+            return Error.Conflict("SLUG_DUPLICADO", "Slug já cadastrado.");
 
-            // Verifica slug único
-            var slugNormalizado = request.Slug.Trim().ToLowerInvariant();
-            if (await _usuarioRepo.GetBySlugAsync(slugNormalizado, cancellationToken) is not null)
-                return Error.Conflict("SLUG_DUPLICADO", "Slug já cadastrado.");
+        // Verifica CPF existente
+        var existentePorCpf = await _usuarioService
+            .BuscarPorCpfAsync(request.Cpf, cancellationToken)
+            .ConfigureAwait(false);
 
-            // Calcula taxa
-            var qtdGerentes = await _usuarioRepo.CountByTipoAsync(TipoUsuario.Gerente, cancellationToken);
-            var gratuito = qtdGerentes < 2;
-            var taxa = gratuito ? 0m : 5.0m;
+        // Se CPF já existe, decide o que fazer baseado no Tipo
+        if (existentePorCpf is not null)
+            return await TratarCpfExistenteNoRegistroGerenteAsync(
+                existentePorCpf, request, slugNormalizado, cancellationToken);
 
-            // Cria Value Objects
-            var cpf = CPF.Criar(request.Cpf);
-            if (cpf.IsFailure) return cpf.Error;
-
-            var email = Email.Criar(request.Email);
-            if (email.IsFailure) return email.Error;
-
-            Telefone? telefone = null;
-            if (!string.IsNullOrWhiteSpace(request.Telefone))
-            {
-                var telResult = Telefone.Criar(request.Telefone);
-                if (telResult.IsFailure) return telResult.Error;
-                telefone = telResult.Value;
-            }
-
-            var senhaHash = BCrypt.Net.BCrypt.HashPassword(request.Senha);
-
-            // Cria o Gerente diretamente (Tipo = Gerente)
-            var usuario = Usuario.CriarGerente(
-                request.Nome, cpf.Value, email.Value, senhaHash,
-                telefone, slugNormalizado, taxa, gratuito, request.ChavePix);
-
-            await _usuarioRepo.AddAsync(usuario, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            await _unitOfWork.CommitAsync(cancellationToken);
-
-            return CriarRespostaGerente(usuario);
-        }
-        catch
-        {
-            await _unitOfWork.RollbackAsync(cancellationToken);
-            throw;
-        }
+        // CPF não existe → cria novo gerente
+        return await CriarNovoGerenteAsync(request, slugNormalizado, cancellationToken);
     }
 
     public async Task<Result<LoginResponse>> Login(
@@ -122,26 +86,15 @@ public class AuthService : IAuthService
             .BuscarPorCpfAsync(request.Cpf, cancellationToken)
             .ConfigureAwait(false);
 
-        // Caso idempotente: usuário já existe como Passageiro com senha definida
-        if (existentePorCpf is not null
-            && !string.IsNullOrWhiteSpace(existentePorCpf.SenhaHash)
-            && existentePorCpf.Tipo == TipoUsuario.Passageiro)
-        {
-            return MontarRespostaPassageiro(existentePorCpf);
-        }
+        // Guard: idempotente — usuário já é Passageiro com senha
+        if (ExistenteEPassageiroComSenha(existentePorCpf))
+            return MontarRespostaPassageiro(existentePorCpf!);
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            Result<RegistrarPassageiroResponse> resultado;
-
-            if (existentePorCpf is null)
-                resultado = await RegistrarNovoPassageiroAsync(request, cancellationToken);
-            else if (string.IsNullOrWhiteSpace(existentePorCpf.SenhaHash))
-                resultado = await CompletarCadastroContaPendenteAsync(
-                    existentePorCpf, request, cancellationToken);
-            else
-                resultado = MontarRespostaPassageiro(existentePorCpf);
+            var resultado = await ResolverRegistroPassageiroAsync(
+                existentePorCpf, request, cancellationToken);
 
             if (resultado.IsFailure)
             {
@@ -151,6 +104,110 @@ public class AuthService : IAuthService
 
             await _unitOfWork.CommitAsync(cancellationToken);
             return resultado;
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    // ── Métodos auxiliares ─────────────────────────────────────────
+
+    private async Task<Result<RegistrarGerenteResponse>> TratarCpfExistenteNoRegistroGerenteAsync(
+        Usuario existente,
+        RegistrarGerenteRequest request,
+        string slugNormalizado,
+        CancellationToken cancellationToken)
+    {
+        return existente.Tipo switch
+        {
+            TipoUsuario.Passageiro => await UpgradePassageiroParaGerenteAsync(
+                existente, request, slugNormalizado, cancellationToken),
+
+            TipoUsuario.Gerente => Error.Conflict(
+                "CPF_JA_CADASTRADO", "CPF já cadastrado como Gerente."),
+
+            _ => Error.Conflict("TIPO_INCOMPATIVEL",
+                $"Usuário com CPF informado é do tipo {existente.Tipo} e não pode ser convertido para Gerente.")
+        };
+    }
+
+    private async Task<Result<RegistrarGerenteResponse>> CriarNovoGerenteAsync(
+        RegistrarGerenteRequest request,
+        string slugNormalizado,
+        CancellationToken cancellationToken)
+    {
+        // Guard: email duplicado
+        if (await _usuarioService.BuscarPorEmailAsync(request.Email, cancellationToken) is not null)
+            return Error.Conflict("EMAIL_JA_CADASTRADO", "Email já cadastrado.");
+
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var (gratuito, taxa) = await CalcularTaxaAsync(cancellationToken);
+
+            var cpf = CPF.Criar(request.Cpf);
+            if (cpf.IsFailure) return cpf.Error;
+
+            var email = Email.Criar(request.Email);
+            if (email.IsFailure) return email.Error;
+
+            var telefone = CriarTelefone(request.Telefone);
+            if (telefone is not null && telefone.IsFailure) return telefone.Error;
+
+            var senhaHash = BCrypt.Net.BCrypt.HashPassword(request.Senha);
+
+            var usuario = Usuario.CriarGerente(
+                request.Nome, cpf!.Value, email!.Value, senhaHash,
+                telefone?.Value, slugNormalizado, taxa, gratuito, request.ChavePix);
+
+            await _usuarioRepo.AddAsync(usuario, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+
+            return CriarRespostaGerente(usuario);
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private async Task<Result<RegistrarGerenteResponse>> UpgradePassageiroParaGerenteAsync(
+        Usuario passageiro,
+        RegistrarGerenteRequest request,
+        string slugNormalizado,
+        CancellationToken cancellationToken)
+    {
+        // Guard: email já em uso por outro usuário
+        var donoDoEmail = await _usuarioService.BuscarPorEmailAsync(request.Email, cancellationToken);
+        if (donoDoEmail is not null && donoDoEmail.Id != passageiro.Id)
+            return Error.Conflict("EMAIL_JA_CADASTRADO", "Email já cadastrado por outro usuário.");
+
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var (gratuito, taxa) = await CalcularTaxaAsync(cancellationToken);
+
+            var email = Email.Criar(request.Email);
+            if (email.IsFailure) return email.Error;
+
+            var telefone = CriarTelefone(request.Telefone);
+            if (telefone is not null && telefone.IsFailure) return telefone.Error;
+
+            var senhaHash = BCrypt.Net.BCrypt.HashPassword(request.Senha);
+
+            passageiro.AtualizarDados(request.Nome, email.Value, telefone?.Value);
+            passageiro.DefinirSenha(senhaHash);
+            passageiro.UpgradeParaGerente(slugNormalizado, taxa, gratuito, request.ChavePix);
+
+            _usuarioRepo.Update(passageiro);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+
+            return CriarRespostaGerente(passageiro);
         }
         catch
         {
@@ -189,6 +246,39 @@ public class AuthService : IAuthService
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         return MontarRespostaPassageiro(usuario);
+    }
+
+    private async Task<Result<RegistrarPassageiroResponse>> ResolverRegistroPassageiroAsync(
+        Usuario? existentePorCpf,
+        RegistrarPassageiroRequest request,
+        CancellationToken cancellationToken)
+    {
+        var semSenha = string.IsNullOrWhiteSpace(existentePorCpf?.SenhaHash);
+
+        return (existentePorCpf, semSenha) switch
+        {
+            (null, _) => await RegistrarNovoPassageiroAsync(request, cancellationToken),
+            (_, true) => await CompletarCadastroContaPendenteAsync(
+                existentePorCpf!, request, cancellationToken),
+            (_, false) => MontarRespostaPassageiro(existentePorCpf!)
+        };
+    }
+
+    // ── Helpers estáticos ──────────────────────────────────────────
+
+    private static bool ExistenteEPassageiroComSenha(Usuario? usuario) =>
+        usuario is not null
+        && !string.IsNullOrWhiteSpace(usuario.SenhaHash)
+        && usuario.Tipo == TipoUsuario.Passageiro;
+
+    private static Result<Telefone>? CriarTelefone(string? telefoneStr) =>
+        string.IsNullOrWhiteSpace(telefoneStr) ? null : Telefone.Criar(telefoneStr);
+
+    private async Task<(bool Gratuito, decimal Taxa)> CalcularTaxaAsync(CancellationToken cancellationToken)
+    {
+        var qtdGerentes = await _usuarioRepo.CountByTipoAsync(TipoUsuario.Gerente, cancellationToken);
+        var gratuito = qtdGerentes < 2;
+        return (gratuito, gratuito ? 0m : 5.0m);
     }
 
     private Result<RegistrarGerenteResponse> CriarRespostaGerente(Usuario usuario)

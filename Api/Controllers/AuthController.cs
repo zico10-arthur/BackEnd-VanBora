@@ -30,6 +30,7 @@ public class AuthController : ControllerBase
     ///     ou o status HTTP correspondente ao erro via <see cref="Middleware.ResultFilter" />.
     /// </returns>
     [HttpPost("gerente/registrar")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(RegistrarGerenteResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
