@@ -15,6 +15,8 @@ public class ViagemRepository : IViagemRepository
         _context = context;
     }
 
+    public IUnitOfWork UnitOfWork => _context;
+
     public async Task<Viagem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.Viagens

@@ -17,6 +17,7 @@ public class ViagemVanRepository : IViagemVanRepository
     public async Task<ViagemVan?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.ViagemVans
+            .Include(vv => vv.Viagem)
             .Include(vv => vv.Van)
             .Include(vv => vv.MotoristaUsuario)
             .FirstOrDefaultAsync(vv => vv.Id == id, cancellationToken);

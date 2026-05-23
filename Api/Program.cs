@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using VanBora.Application.DTOs.Auth;
 using VanBora.Application.DTOs.Vans;
+using VanBora.Application.DTOs.Viagens;
 using VanBora.Application.Interfaces;
 using VanBora.Application.Mappings;
 using VanBora.Application.Services;
@@ -50,6 +51,7 @@ builder.Services.AddScoped<IUsuarioService, UsuarioService>();
 builder.Services.AddScoped<ILoginService, LoginService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IVanService, VanService>();
+builder.Services.AddScoped<IViagemService, ViagemService>();
 
 // ── Validators ──────────────────────────────────────────────────
 builder.Services.AddScoped<IValidator<RegistrarGerenteRequest>, RegistrarGerenteValidator>();
@@ -57,6 +59,9 @@ builder.Services.AddScoped<IValidator<LoginRequest>, LoginValidator>();
 builder.Services.AddScoped<IValidator<RegistrarPassageiroRequest>, RegistrarPassageiroRequestValidator>();
 builder.Services.AddScoped<IValidator<CriarVanRequest>, CriarVanValidator>();
 builder.Services.AddScoped<IValidator<AtualizarVanRequest>, AtualizarVanValidator>();
+builder.Services.AddScoped<IValidator<CriarViagemRequest>, CriarViagemValidator>();
+builder.Services.AddScoped<IValidator<AtualizarViagemRequest>, AtualizarViagemValidator>();
+builder.Services.AddScoped<IValidator<AlocarVanRequest>, AlocarVanValidator>();
 
 // ── Infrastructure ──────────────────────────────────────────────
 builder.Services.AddInfrastructure(builder.Configuration);

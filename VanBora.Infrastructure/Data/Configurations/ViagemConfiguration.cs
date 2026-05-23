@@ -52,6 +52,10 @@ public class ViagemConfiguration : IEntityTypeConfiguration<Viagem>
             .IsRequired()
             .HasColumnName("possui_ingresso");
 
+        builder.Property(v => v.QuorumMinimo)
+            .IsRequired()
+            .HasColumnName("quorum_minimo");
+
         builder.Property(v => v.Status)
             .IsRequired()
             .HasConversion<string>()

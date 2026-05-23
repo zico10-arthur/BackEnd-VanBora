@@ -21,16 +21,14 @@ public class ViagemVan
     private ViagemVan() { }
 #pragma warning restore CS8618
 
-    public ViagemVan(Guid viagemId, Van van)
+    public ViagemVan(Guid viagemId, Guid vanId)
     {
         Guard.AgainstEmptyGuid(viagemId, nameof(viagemId));
-        Guard.AgainstNull(van, nameof(van));
-        Guard.AgainstInvalidState(van.Ativo, "Não é possível alocar uma van inativa a uma viagem.");
+        Guard.AgainstEmptyGuid(vanId, nameof(vanId));
 
         Id = Guid.NewGuid();
         ViagemId = viagemId;
-        VanId = van.Id;
-        Van = van;
+        VanId = vanId;
     }
 
     public void AlocarMotorista(Guid motoristaUsuarioId)

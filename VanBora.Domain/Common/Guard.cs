@@ -54,7 +54,7 @@ public static class Guard
 
     public static void AgainstInvalidState(bool condition, string message)
     {
-        if (!condition)
+        if (condition)
             throw new InvalidOperationException(message);
     }
 
