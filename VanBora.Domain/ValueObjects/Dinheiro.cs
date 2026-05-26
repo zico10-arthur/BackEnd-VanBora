@@ -12,6 +12,10 @@ public sealed class Dinheiro
     public decimal Valor { get; }
     public string Moeda { get; }
 
+#pragma warning disable CS8618 // EF Core constructor
+    private Dinheiro() { }
+#pragma warning restore CS8618
+
     private Dinheiro(decimal valor, string moeda)
     {
         Valor = valor;

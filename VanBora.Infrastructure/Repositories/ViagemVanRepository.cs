@@ -18,6 +18,7 @@ public class ViagemVanRepository : IViagemVanRepository
     {
         return await _context.ViagemVans
             .Include(vv => vv.Viagem)
+                .ThenInclude(v => v.GerenteUsuario)
             .Include(vv => vv.Van)
             .Include(vv => vv.MotoristaUsuario)
             .FirstOrDefaultAsync(vv => vv.Id == id, cancellationToken);

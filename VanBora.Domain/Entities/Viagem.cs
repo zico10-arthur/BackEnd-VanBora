@@ -44,7 +44,7 @@ public class Viagem
         Guard.AgainstNullOrWhiteSpace(localPartida, nameof(localPartida));
         Guard.AgainstNegativeOrZero(precoAssento, nameof(precoAssento));
         Guard.AgainstNegativeOrZero(quorumMinimo, nameof(quorumMinimo));
-        Guard.AgainstInvalidState(dataPartida < dataEvento, "Data de partida deve ser anterior à data do evento.");
+        Guard.AgainstInvalidState(dataPartida >= dataEvento, "Data de partida deve ser anterior à data do evento.");
 
         Id = Guid.NewGuid();
         GerenteUsuarioId = gerenteUsuarioId;
@@ -71,7 +71,7 @@ public class Viagem
         Guard.AgainstNullOrWhiteSpace(nomeEvento, nameof(nomeEvento));
         Guard.AgainstNullOrWhiteSpace(localEvento, nameof(localEvento));
         Guard.AgainstNullOrWhiteSpace(localPartida, nameof(localPartida));
-        Guard.AgainstInvalidState(dataPartida < dataEvento, "Data de partida deve ser anterior à data do evento.");
+        Guard.AgainstInvalidState(dataPartida >= dataEvento, "Data de partida deve ser anterior à data do evento.");
 
         NomeEvento = nomeEvento;
         DataEvento = dataEvento;
@@ -83,22 +83,22 @@ public class Viagem
 
     public void Iniciar()
     {
-        Guard.AgainstInvalidState(Status == StatusViagem.Agendada, "Apenas viagens agendadas podem ser iniciadas.");
+        Guard.AgainstInvalidState(Status != StatusViagem.Agendada, "Apenas viagens agendadas podem ser iniciadas.");
 
         Status = StatusViagem.EmAndamento;
     }
 
     public void Concluir()
     {
-        Guard.AgainstInvalidState(Status == StatusViagem.EmAndamento, "Apenas viagens em andamento podem ser concluídas.");
+        Guard.AgainstInvalidState(Status != StatusViagem.EmAndamento, "Apenas viagens em andamento podem ser concluídas.");
 
         Status = StatusViagem.Concluida;
     }
 
     public void Cancelar()
     {
-        Guard.AgainstInvalidState(Status != StatusViagem.Concluida, "Viagem já concluída não pode ser cancelada.");
-        Guard.AgainstInvalidState(Status != StatusViagem.Cancelada, "Viagem já está cancelada.");
+        Guard.AgainstInvalidState(Status == StatusViagem.Concluida, "Viagem já concluída não pode ser cancelada.");
+        Guard.AgainstInvalidState(Status == StatusViagem.Cancelada, "Viagem já está cancelada.");
 
         Status = StatusViagem.Cancelada;
     }

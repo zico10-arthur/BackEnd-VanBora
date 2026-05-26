@@ -11,19 +11,19 @@ public class AppDbContext : DbContext, IUnitOfWork
     public DbSet<Van> Vans => Set<Van>();
     public DbSet<Viagem> Viagens => Set<Viagem>();
     public DbSet<ViagemVan> ViagemVans => Set<ViagemVan>();
+    public DbSet<Reserva> Reservas => Set<Reserva>();
+    public DbSet<ItemReserva> ItensReserva => Set<ItemReserva>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Reserva/ItemReserva serão adicionados em Sprints futuras
-        modelBuilder.Ignore<ItemReserva>();
-        modelBuilder.Ignore<Reserva>();
-
         modelBuilder.ApplyConfiguration(new UsuarioConfiguration());
         modelBuilder.ApplyConfiguration(new VanConfiguration());
         modelBuilder.ApplyConfiguration(new ViagemConfiguration());
         modelBuilder.ApplyConfiguration(new ViagemVanConfiguration());
+        modelBuilder.ApplyConfiguration(new ReservaConfiguration());
+        modelBuilder.ApplyConfiguration(new ItemReservaConfiguration());
     }
 
     // Implementação de IUnitOfWork
