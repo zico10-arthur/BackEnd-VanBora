@@ -37,6 +37,7 @@ public class ResultFilter : IAsyncResultFilter
                 {
                     var errorResult = MapErrorToActionResult(result.Error);
                     context.Result = errorResult;
+                    await next();
                     return;
                 }
 

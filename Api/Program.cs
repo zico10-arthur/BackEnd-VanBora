@@ -54,6 +54,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IVanService, VanService>();
 builder.Services.AddScoped<IViagemService, ViagemService>();
 builder.Services.AddScoped<IReservaService, ReservaService>();
+builder.Services.AddScoped<IRelatorioService, RelatorioService>();
 
 // ── Validators ──────────────────────────────────────────────────
 builder.Services.AddScoped<IValidator<RegistrarGerenteRequest>, RegistrarGerenteValidator>();

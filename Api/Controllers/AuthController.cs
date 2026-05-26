@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VanBora.Application.DTOs.Auth;
@@ -99,6 +100,35 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    ///     Atualiza os dados do usuário autenticado (US18).
+    /// </summary>
+    /// <param name="request">Dados a serem atualizados (nome, email, telefone, senha, slug, chavePix, CNH).</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>
+    ///     200 OK com os dados atualizados (sem token ou senha),
+    ///     ou o status HTTP correspondente ao erro via <see cref="Middleware.ResultFilter" />.
+    /// </returns>
+    [HttpPut("usuario")]
+    [Authorize]
+    [ProducesResponseType(typeof(AtualizarUsuarioResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> AtualizarUsuario(
+        [FromBody] AtualizarUsuarioRequest request,
+        CancellationToken cancellationToken)
+    {
+        var usuarioId = ObterUsuarioId();
+        var result = await _authService.AtualizarUsuarioAsync(usuarioId, request, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     ///     Converte <see cref="Error" /> do cadastro de passageiro em resposta HTTP explícita (US03 / Dev 4).
     /// </summary>
     private IActionResult MapearFalhaRegistrarPassageiro(Error error)
@@ -114,4 +144,12 @@ public class AuthController : ControllerBase
     }
 
     private sealed record ErrorResponse(string Code, string Message);
+
+    private Guid ObterUsuarioId()
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? throw new UnauthorizedAccessException("Usuário não autenticado.");
+
+        return Guid.Parse(sub);
+    }
 }

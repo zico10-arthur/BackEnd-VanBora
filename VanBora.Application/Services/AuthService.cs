@@ -341,4 +341,107 @@ public class AuthService : IAuthService
         var primeiroErro = result.Errors.First();
         return Error.Validation(primeiroErro.ErrorCode, primeiroErro.ErrorMessage);
     }
+
+    // ── US18: Atualizar Usuario ─────────────────────────────────────
+
+    public async Task<Result<AtualizarUsuarioResponse>> AtualizarUsuarioAsync(
+        Guid usuarioId,
+        AtualizarUsuarioRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var usuario = await _usuarioRepo.GetByIdAsync(usuarioId, cancellationToken);
+        if (usuario is null)
+            return Error.NotFound("USUARIO_NAO_ENCONTRADO", "Usuário não encontrado.");
+
+        return await AtualizarDadosUsuarioAsync(usuario, request, cancellationToken);
+    }
+
+    private async Task<Result<AtualizarUsuarioResponse>> AtualizarDadosUsuarioAsync(
+        Usuario usuario,
+        AtualizarUsuarioRequest request,
+        CancellationToken cancellationToken)
+    {
+        // Valida email
+        var email = Email.Criar(request.Email);
+        if (email.IsFailure) return email.Error;
+
+        // Verifica se o email ja esta em uso por outro usuario
+        var donoDoEmail = await _usuarioRepo.GetByEmailAsync(email.Value, cancellationToken);
+        if (donoDoEmail is not null && donoDoEmail.Id != usuario.Id)
+            return Error.Conflict("EMAIL_JA_CADASTRADO", "Email ja cadastrado por outro usuario.");
+
+        // Valida telefone
+        Telefone? telefone = null;
+        if (!string.IsNullOrWhiteSpace(request.Telefone))
+        {
+            var telResult = Telefone.Criar(request.Telefone);
+            if (telResult.IsFailure) return telResult.Error;
+            telefone = telResult.Value;
+        }
+
+        // Atualiza dados basicos (nome, email, telefone)
+        usuario.AtualizarDados(request.Nome, email.Value, telefone);
+
+        // Senha
+        if (!string.IsNullOrWhiteSpace(request.Senha))
+        {
+            var senhaHash = BCrypt.Net.BCrypt.HashPassword(request.Senha);
+            usuario.DefinirSenha(senhaHash);
+        }
+
+        // Slug (apenas Gerente)
+        if (!string.IsNullOrWhiteSpace(request.Slug))
+        {
+            if (usuario.Tipo != TipoUsuario.Gerente)
+                return Error.Forbidden("ACAO_NAO_PERMITIDA", "Apenas Gerentes podem alterar o slug.");
+
+            var slugNormalizado = request.Slug.Trim().ToLowerInvariant();
+            if (await _usuarioRepo.GetBySlugAsync(slugNormalizado, cancellationToken) is not null)
+                return Error.Conflict("SLUG_DUPLICADO", "Slug ja cadastrado.");
+
+            usuario.AtualizarSlug(slugNormalizado);
+        }
+
+        // ChavePix (apenas Gerente)
+        if (request.ChavePix is not null)
+        {
+            if (usuario.Tipo != TipoUsuario.Gerente)
+                return Error.Forbidden("ACAO_NAO_PERMITIDA", "Apenas Gerentes podem alterar a chave PIX.");
+
+            usuario.AtualizarChavePix(string.IsNullOrWhiteSpace(request.ChavePix) ? null : request.ChavePix);
+        }
+
+        // CNH (apenas Motorista)
+        if (!string.IsNullOrWhiteSpace(request.NumeroCNH))
+        {
+            if (usuario.Tipo != TipoUsuario.Motorista)
+                return Error.Forbidden("ACAO_NAO_PERMITIDA", "Apenas Motoristas podem registrar CNH.");
+
+            var cnh = CNH.Criar(request.NumeroCNH);
+            if (cnh.IsFailure) return cnh.Error;
+
+            usuario.RegistrarCNH(cnh.Value);
+        }
+
+        _usuarioRepo.Update(usuario);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return MontarRespostaAtualizacao(usuario);
+    }
+
+    private static Result<AtualizarUsuarioResponse> MontarRespostaAtualizacao(Usuario usuario)
+    {
+        return Result<AtualizarUsuarioResponse>.Success(new AtualizarUsuarioResponse
+        {
+            UsuarioId = usuario.Id,
+            Nome = usuario.Nome,
+            Email = usuario.Email?.Valor ?? string.Empty,
+            Telefone = usuario.Telefone?.ValorCompleto,
+            Cpf = usuario.CPF.Valor,
+            Tipo = usuario.Tipo.ToString(),
+            Slug = usuario.Slug,
+            ChavePix = usuario.ChavePix,
+            NumeroCNH = usuario.CNH?.Valor
+        });
+    }
 }

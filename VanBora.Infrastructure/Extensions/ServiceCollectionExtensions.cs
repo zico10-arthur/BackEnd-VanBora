@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
 
         // Services
         services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<IEmailService, EmailService>();
 
         return services;
     }

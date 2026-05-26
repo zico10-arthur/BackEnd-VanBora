@@ -15,10 +15,14 @@ namespace Api.Controllers.Gerente;
 public class ViagensController : ControllerBase
 {
     private readonly IViagemService _viagemService;
+    private readonly IRelatorioService _relatorioService;
 
-    public ViagensController(IViagemService viagemService)
+    public ViagensController(
+        IViagemService viagemService,
+        IRelatorioService relatorioService)
     {
         _viagemService = viagemService;
+        _relatorioService = relatorioService;
     }
 
     /// <summary>
@@ -127,6 +131,25 @@ public class ViagensController : ControllerBase
     {
         var gerenteId = ObterGerenteId();
         var result = await _viagemService.RemoverVanAsync(gerenteId, viagemId, viagemVanId, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    ///     Gera relatório financeiro da viagem com indicadores de reservas.
+    /// </summary>
+    [HttpGet("{viagemId:guid}/relatorio")]
+    [ProducesResponseType(typeof(RelatorioResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GerarRelatorio(Guid viagemId, CancellationToken cancellationToken)
+    {
+        var gerenteId = ObterGerenteId();
+        var result = await _relatorioService.GerarRelatorioAsync(gerenteId, viagemId, cancellationToken);
 
         if (result.IsFailure)
             return new ObjectResult(result);

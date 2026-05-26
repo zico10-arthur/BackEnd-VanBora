@@ -196,4 +196,30 @@ public class Usuario
         ChavePix = chavePix;
         DataAtualizacao = DateTime.UtcNow;
     }
+
+    public void AtualizarSlug(string slug)
+    {
+        Guard.AgainstInvalidState(Tipo == TipoUsuario.Gerente, "Apenas Gerentes podem alterar o slug.");
+        Guard.AgainstNullOrWhiteSpace(slug, nameof(slug));
+
+        Slug = slug.Trim().ToLowerInvariant();
+        DataAtualizacao = DateTime.UtcNow;
+    }
+
+    public void AtualizarChavePix(string? chavePix)
+    {
+        Guard.AgainstInvalidState(Tipo == TipoUsuario.Gerente, "Apenas Gerentes podem alterar a chave PIX.");
+
+        ChavePix = chavePix;
+        DataAtualizacao = DateTime.UtcNow;
+    }
+
+    public void RegistrarCNH(CNH cnh)
+    {
+        Guard.AgainstInvalidState(Tipo == TipoUsuario.Motorista, "Apenas Motoristas podem registrar CNH.");
+        Guard.AgainstNull(cnh, nameof(cnh));
+
+        CNH = cnh;
+        DataAtualizacao = DateTime.UtcNow;
+    }
 }
