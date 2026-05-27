@@ -21,4 +21,14 @@ public interface IAuthService
         Guid usuarioId,
         AtualizarUsuarioRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<Result<string>> AlterarSenhaAsync(
+        Guid usuarioId,
+        AlterarSenhaRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<AtualizarUsuarioResponse>> AtualizarSlugAsync(
+        Guid usuarioId,
+        AtualizarSlugRequest request,
+        CancellationToken cancellationToken = default);
 }

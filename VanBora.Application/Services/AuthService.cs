@@ -342,7 +342,7 @@ public class AuthService : IAuthService
         return Error.Validation(primeiroErro.ErrorCode, primeiroErro.ErrorMessage);
     }
 
-    // ── US18: Atualizar Usuario ─────────────────────────────────────
+    // ── US18: Atualizar Usuario (dados do perfil) ───────────────────
 
     public async Task<Result<AtualizarUsuarioResponse>> AtualizarUsuarioAsync(
         Guid usuarioId,
@@ -381,26 +381,6 @@ public class AuthService : IAuthService
 
         // Atualiza dados basicos (nome, email, telefone)
         usuario.AtualizarDados(request.Nome, email.Value, telefone);
-
-        // Senha
-        if (!string.IsNullOrWhiteSpace(request.Senha))
-        {
-            var senhaHash = BCrypt.Net.BCrypt.HashPassword(request.Senha);
-            usuario.DefinirSenha(senhaHash);
-        }
-
-        // Slug (apenas Gerente)
-        if (!string.IsNullOrWhiteSpace(request.Slug))
-        {
-            if (usuario.Tipo != TipoUsuario.Gerente)
-                return Error.Forbidden("ACAO_NAO_PERMITIDA", "Apenas Gerentes podem alterar o slug.");
-
-            var slugNormalizado = request.Slug.Trim().ToLowerInvariant();
-            if (await _usuarioRepo.GetBySlugAsync(slugNormalizado, cancellationToken) is not null)
-                return Error.Conflict("SLUG_DUPLICADO", "Slug ja cadastrado.");
-
-            usuario.AtualizarSlug(slugNormalizado);
-        }
 
         // ChavePix (apenas Gerente)
         if (request.ChavePix is not null)
@@ -443,5 +423,62 @@ public class AuthService : IAuthService
             ChavePix = usuario.ChavePix,
             NumeroCNH = usuario.CNH?.Valor
         });
+    }
+
+    // ── US21: Alterar Senha ─────────────────────────────────────────
+
+    public async Task<Result<string>> AlterarSenhaAsync(
+        Guid usuarioId,
+        AlterarSenhaRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var usuario = await _usuarioRepo.GetByIdAsync(usuarioId, cancellationToken);
+        if (usuario is null)
+            return Error.NotFound("USUARIO_NAO_ENCONTRADO", "Usuário não encontrado.");
+
+        // Valida senha atual
+        if (string.IsNullOrWhiteSpace(usuario.SenhaHash))
+            return Error.Forbidden("SEM_SENHA", "Usuário não possui senha cadastrada.");
+
+        if (!BCrypt.Net.BCrypt.Verify(request.SenhaAtual, usuario.SenhaHash))
+            return Error.Unauthorized("SENHA_ATUAL_INCORRETA", "Senha atual incorreta.");
+
+        // Gera hash da nova senha
+        var senhaHash = BCrypt.Net.BCrypt.HashPassword(request.SenhaNova);
+        usuario.DefinirSenha(senhaHash);
+
+        _usuarioRepo.Update(usuario);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result<string>.Success("Senha alterada com sucesso.");
+    }
+
+    // ── US19: Atualizar Slug do Gerente ─────────────────────────────
+
+    public async Task<Result<AtualizarUsuarioResponse>> AtualizarSlugAsync(
+        Guid usuarioId,
+        AtualizarSlugRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var usuario = await _usuarioRepo.GetByIdAsync(usuarioId, cancellationToken);
+        if (usuario is null)
+            return Error.NotFound("USUARIO_NAO_ENCONTRADO", "Usuário não encontrado.");
+
+        // Apenas Gerentes podem ter slug
+        if (usuario.Tipo != TipoUsuario.Gerente)
+            return Error.Forbidden("ACAO_NAO_PERMITIDA", "Apenas Gerentes podem alterar o slug.");
+
+        var slugNormalizado = request.Slug.Trim().ToLowerInvariant();
+
+        // Verifica unicidade do slug
+        if (await _usuarioRepo.GetBySlugAsync(slugNormalizado, cancellationToken) is not null)
+            return Error.Conflict("SLUG_DUPLICADO", "Slug já cadastrado.");
+
+        usuario.AtualizarSlug(slugNormalizado);
+
+        _usuarioRepo.Update(usuario);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return MontarRespostaAtualizacao(usuario);
     }
 }
