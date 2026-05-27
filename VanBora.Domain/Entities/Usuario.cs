@@ -28,6 +28,10 @@ public class Usuario
     public CNH? CNH { get; private set; }
     public Guid? CriadoPorUsuarioId { get; private set; }
 
+    // Exclusão de conta (US20)
+    public string? CodigoExclusao { get; private set; }
+    public DateTime? CodigoExclusaoExpiraEm { get; private set; }
+
     // Navigation — APENAS auto-relacionamento Motorista → Gerente
     public Usuario? CriadoPorUsuario { get; private set; }
 
@@ -204,6 +208,19 @@ public class Usuario
 
         Slug = slug.Trim().ToLowerInvariant();
         DataAtualizacao = DateTime.UtcNow;
+    }
+
+    public void DefinirCodigoExclusao(string codigo, DateTime expiraEm)
+    {
+        Guard.AgainstNullOrWhiteSpace(codigo, nameof(codigo));
+        CodigoExclusao = codigo;
+        CodigoExclusaoExpiraEm = expiraEm;
+    }
+
+    public void LimparCodigoExclusao()
+    {
+        CodigoExclusao = null;
+        CodigoExclusaoExpiraEm = null;
     }
 
     public void AtualizarChavePix(string? chavePix)

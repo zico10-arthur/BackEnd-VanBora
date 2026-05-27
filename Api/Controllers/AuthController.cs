@@ -188,6 +188,63 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    ///     Solicita a exclusão da conta do usuário autenticado (US20).
+    ///     Um código de 6 dígitos é enviado para o email cadastrado.
+    /// </summary>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>
+    ///     200 OK com mensagem de sucesso,
+    ///     ou 404 se o usuário não for encontrado,
+    ///     ou 409 se a conta já estiver desativada ou houver reservas ativas.
+    /// </returns>
+    [HttpPost("solicitar-exclusao")]
+    [Authorize]
+    [ProducesResponseType(typeof(SolicitarExclusaoResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> SolicitarExclusao(
+        CancellationToken cancellationToken)
+    {
+        var usuarioId = ObterUsuarioId();
+        var result = await _authService.SolicitarExclusaoAsync(usuarioId, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    ///     Confirma a exclusão da conta com o código recebido por email (US20).
+    /// </summary>
+    /// <param name="request">Código de 6 dígitos enviado por email.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>
+    ///     200 OK com mensagem de sucesso (conta desativada),
+    ///     ou 400 se o código for inválido/expirado,
+    ///     ou 404 se o usuário não for encontrado.
+    /// </returns>
+    [HttpPost("confirmar-exclusao")]
+    [Authorize]
+    [ProducesResponseType(typeof(ConfirmarExclusaoResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ConfirmarExclusao(
+        [FromBody] ConfirmarExclusaoRequest request,
+        CancellationToken cancellationToken)
+    {
+        var usuarioId = ObterUsuarioId();
+        var result = await _authService.ConfirmarExclusaoAsync(usuarioId, request, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     ///     Converte <see cref="Error" /> do cadastro de passageiro em resposta HTTP explícita (US03 / Dev 4).
     /// </summary>
     private IActionResult MapearFalhaRegistrarPassageiro(Error error)

@@ -31,4 +31,13 @@ public interface IAuthService
         Guid usuarioId,
         AtualizarSlugRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<Result<SolicitarExclusaoResponse>> SolicitarExclusaoAsync(
+        Guid usuarioId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<ConfirmarExclusaoResponse>> ConfirmarExclusaoAsync(
+        Guid usuarioId,
+        ConfirmarExclusaoRequest request,
+        CancellationToken cancellationToken = default);
 }

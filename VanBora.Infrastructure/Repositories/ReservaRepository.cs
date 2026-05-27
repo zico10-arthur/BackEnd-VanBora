@@ -75,6 +75,17 @@ public class ReservaRepository : IReservaRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<bool> HasReservasAtivasByUsuarioIdAsync(Guid usuarioId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Reservas
+            .AsNoTracking()
+            .AnyAsync(r =>
+                r.UsuarioId == usuarioId &&
+                ((r.Status == StatusReserva.PendentePagamento && r.ExpiraEm >= DateTime.UtcNow) ||
+                  r.Status == StatusReserva.Confirmada ||
+                  r.Status == StatusReserva.EmAndamento), cancellationToken);
+    }
+
     public async Task AddAsync(Reserva reserva, CancellationToken cancellationToken = default)
     {
         await _context.Reservas.AddAsync(reserva, cancellationToken);

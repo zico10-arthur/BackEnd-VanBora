@@ -16,6 +16,8 @@ public class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUsuarioRepository _usuarioRepo;
+    private readonly IReservaRepository _reservaRepo;
+    private readonly IEmailService _emailService;
     private readonly IValidator<RegistrarGerenteRequest> _gerenteValidator;
     private readonly IValidator<RegistrarPassageiroRequest> _passageiroValidator;
 
@@ -25,6 +27,8 @@ public class AuthService : IAuthService
         ITokenService tokenService,
         IUnitOfWork unitOfWork,
         IUsuarioRepository usuarioRepo,
+        IReservaRepository reservaRepo,
+        IEmailService emailService,
         IValidator<RegistrarGerenteRequest> gerenteValidator,
         IValidator<RegistrarPassageiroRequest> passageiroValidator)
     {
@@ -33,6 +37,8 @@ public class AuthService : IAuthService
         _tokenService = tokenService;
         _unitOfWork = unitOfWork;
         _usuarioRepo = usuarioRepo;
+        _reservaRepo = reservaRepo;
+        _emailService = emailService;
         _gerenteValidator = gerenteValidator;
         _passageiroValidator = passageiroValidator;
     }
@@ -480,5 +486,90 @@ public class AuthService : IAuthService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return MontarRespostaAtualizacao(usuario);
+    }
+
+    // ── US20: Desativar Conta (Sprint 4 - Dev 1) ────────────────────
+
+    public async Task<Result<SolicitarExclusaoResponse>> SolicitarExclusaoAsync(
+        Guid usuarioId,
+        CancellationToken cancellationToken = default)
+    {
+        var usuario = await _usuarioRepo.GetByIdAsync(usuarioId, cancellationToken);
+        if (usuario is null)
+            return Error.NotFound("USUARIO_NAO_ENCONTRADO", "Usuário não encontrado.");
+
+        if (!usuario.Ativo)
+            return Error.Conflict("CONTA_JA_DESATIVADA", "A conta já está desativada.");
+
+        // Verifica se possui reservas ativas
+        var possuiReservasAtivas = await _reservaRepo.HasReservasAtivasByUsuarioIdAsync(usuarioId, cancellationToken);
+        if (possuiReservasAtivas)
+            return Error.Conflict("RESERVAS_ATIVAS", "Não é possível desativar a conta enquanto houver reservas ativas. Cancele ou aguarde a conclusão antes de solicitar a exclusão.");
+
+        // Gera código de 6 dígitos
+        var codigo = Random.Shared.Next(100000, 999999).ToString();
+        var expiraEm = DateTime.UtcNow.AddMinutes(10);
+
+        // Envia o código por email primeiro
+        var emailDestino = usuario.Email?.Valor;
+        if (!string.IsNullOrWhiteSpace(emailDestino))
+        {
+            var emailResult = await _emailService.SendAsync(
+                emailDestino,
+                "Código de exclusão de conta - VanBora",
+                $"Seu código de exclusão de conta é: {codigo}. Ele expira em 10 minutos.",
+                cancellationToken);
+
+            if (emailResult.IsFailure)
+                return Error.Failure("ERRO_ENVIO_EMAIL", "Erro ao enviar o código de exclusão. Tente novamente.");
+        }
+
+        // Persiste o código no banco (somente após email enviado com sucesso)
+        usuario.DefinirCodigoExclusao(codigo, expiraEm);
+        _usuarioRepo.Update(usuario);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result<SolicitarExclusaoResponse>.Success(
+            new SolicitarExclusaoResponse("Código de exclusão enviado para o email cadastrado. O código expira em 10 minutos."));
+    }
+
+    public async Task<Result<ConfirmarExclusaoResponse>> ConfirmarExclusaoAsync(
+        Guid usuarioId,
+        ConfirmarExclusaoRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var usuario = await _usuarioRepo.GetByIdAsync(usuarioId, cancellationToken);
+        if (usuario is null)
+            return Error.NotFound("USUARIO_NAO_ENCONTRADO", "Usuário não encontrado.");
+
+        if (!usuario.Ativo)
+            return Error.Conflict("CONTA_JA_DESATIVADA", "A conta já está desativada.");
+
+        // Verifica se há código solicitado
+        if (string.IsNullOrWhiteSpace(usuario.CodigoExclusao) || usuario.CodigoExclusaoExpiraEm is null)
+            return Error.Validation("CODIGO_NAO_SOLICITADO", "Nenhum código de exclusão foi solicitado. Solicite a exclusão primeiro.");
+
+        // Verifica expiração
+        if (DateTime.UtcNow > usuario.CodigoExclusaoExpiraEm.Value)
+        {
+            usuario.LimparCodigoExclusao();
+            _usuarioRepo.Update(usuario);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            return Error.Validation("CODIGO_EXPIRADO", "O código de exclusão expirou. Solicite um novo código.");
+        }
+
+        // Valida o código
+        if (!string.Equals(request.Codigo, usuario.CodigoExclusao, StringComparison.Ordinal))
+            return Error.Validation("CODIGO_INVALIDO", "Código de exclusão inválido.");
+
+        // Limpa o código e desativa a conta
+        usuario.LimparCodigoExclusao();
+        usuario.Desativar();
+        _usuarioRepo.Update(usuario);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result<ConfirmarExclusaoResponse>.Success(
+            new ConfirmarExclusaoResponse("Conta desativada com sucesso."));
     }
 }

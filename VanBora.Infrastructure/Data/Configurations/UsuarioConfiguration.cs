@@ -113,6 +113,14 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
             .HasForeignKey(u => u.CriadoPorUsuarioId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Código de exclusão de conta (US20)
+        builder.Property(u => u.CodigoExclusao)
+            .HasMaxLength(6)
+            .HasColumnName("codigo_exclusao");
+
+        builder.Property(u => u.CodigoExclusaoExpiraEm)
+            .HasColumnName("codigo_exclusao_expira_em");
+
         // Índices
         builder.HasIndex(u => u.Slug)
             .HasDatabaseName("ix_usuarios_slug")
