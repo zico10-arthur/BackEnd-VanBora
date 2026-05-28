@@ -46,6 +46,8 @@ builder.Services.AddAuthorization();
 
 // ── AutoMapper ──────────────────────────────────────────────────
 builder.Services.AddAutoMapper(typeof(VanProfile).Assembly);
+builder.Services.AddAutoMapper(typeof(MotoristaProfile).Assembly);
+
 
 // ── Application Services ────────────────────────────────────────
 builder.Services.AddScoped<IUsuarioService, UsuarioService>();
@@ -55,6 +57,8 @@ builder.Services.AddScoped<IVanService, VanService>();
 builder.Services.AddScoped<IViagemService, ViagemService>();
 builder.Services.AddScoped<IReservaService, ReservaService>();
 builder.Services.AddScoped<IRelatorioService, RelatorioService>();
+builder.Services.AddScoped<IMotoristaService, MotoristaService>();
+
 
 // ── Validators ──────────────────────────────────────────────────
 builder.Services.AddScoped<IValidator<RegistrarGerenteRequest>, RegistrarGerenteValidator>();
@@ -65,7 +69,9 @@ builder.Services.AddScoped<IValidator<AtualizarVanRequest>, AtualizarVanValidato
 builder.Services.AddScoped<IValidator<CriarViagemRequest>, CriarViagemValidator>();
 builder.Services.AddScoped<IValidator<AtualizarViagemRequest>, AtualizarViagemValidator>();
 builder.Services.AddScoped<IValidator<AlocarVanRequest>, AlocarVanValidator>();
+builder.Services.AddScoped<IValidator<RegistrarMotoristaRequest>, RegistrarMotoristaValidator>();
 builder.Services.AddScoped<IValidator<CriarReservaRequest>, CriarReservaValidator>();
+
 
 // ── Infrastructure ──────────────────────────────────────────────
 builder.Services.AddInfrastructure(builder.Configuration);

@@ -15,6 +15,7 @@ namespace Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IMotoristaService _motorista;
 
     public AuthController(IAuthService authService)
     {
@@ -267,5 +268,21 @@ public class AuthController : ControllerBase
             ?? throw new UnauthorizedAccessException("Usuário não autenticado.");
 
         return Guid.Parse(sub);
+    }
+    [HttpPost("motorista/registrar")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(RegistrarGerenteResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RegistrarMotorista(
+        [FromBody] RegistrarMotoristaRequest request,Guid gerenteid,
+        CancellationToken ct)
+    {
+        var result = await _motorista.RegistrarMotorista(gerenteid, request, ct);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Created(string.Empty, result.Value);
     }
 }
