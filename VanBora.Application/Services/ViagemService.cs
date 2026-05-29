@@ -19,6 +19,10 @@ public class ViagemService : IViagemService
     private readonly IValidator<AtualizarViagemRequest> _atualizarValidator;
     private readonly IValidator<AlocarVanRequest> _alocarVanValidator;
 
+    private readonly IValidator<AlocarMotoristaRequest> _alocarmotorista;
+
+    private readonly IUsuarioRepository _repository;
+
     public ViagemService(
         IViagemRepository viagemRepo,
         IVanRepository vanRepo,
@@ -26,7 +30,7 @@ public class ViagemService : IViagemService
         IMapper mapper,
         IValidator<CriarViagemRequest> criarValidator,
         IValidator<AtualizarViagemRequest> atualizarValidator,
-        IValidator<AlocarVanRequest> alocarVanValidator)
+        IValidator<AlocarVanRequest> alocarVanValidator, IUsuarioRepository repository)
     {
         _viagemRepo = viagemRepo;
         _vanRepo = vanRepo;
@@ -35,6 +39,7 @@ public class ViagemService : IViagemService
         _criarValidator = criarValidator;
         _atualizarValidator = atualizarValidator;
         _alocarVanValidator = alocarVanValidator;
+        _repository = repository;
     }
 
     public async Task<Result<ViagemResponse>> CriarAsync(
@@ -251,5 +256,54 @@ public class ViagemService : IViagemService
 
         return Result<bool>.Success(true);
     }
+
+     public async Task<Result<ViagemResponse>> AlocarMotoristaAsync(
+        Guid gerenteUsuarioId,
+        Guid viagemId,
+        AlocarMotoristaRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var validation = await _alocarmotorista.ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid)
+        {
+            var erros = validation.Errors
+                .Select(e => new Error(e.PropertyName, e.ErrorMessage))
+                .ToList();
+
+            return Result<ViagemResponse>.Failure(Error.Validation(erros));
+        }
+
+        var viagem = await _viagemRepo.GetByIdAsync(viagemId, cancellationToken);
+        if (viagem is null)
+            return Result<ViagemResponse>.Failure(Error.NotFound("VIAGEM_NAO_ENCONTRADA", "Viagem não encontrada."));
+
+        if (viagem.GerenteUsuarioId != gerenteUsuarioId)
+            return Result<ViagemResponse>.Failure(Error.Forbidden("ACESSO_NEGADO", "Você não tem permissão para alterar esta viagem."));
+
+        if (viagem.Status != StatusViagem.Agendada)
+            return Result<ViagemResponse>.Failure(Error.Validation("STATUS_INVALIDO", "Apenas viagens agendadas podem receber motoristas."));
+
+        var motorista = await _repository.GetByIdAsync(request.MotoristaId, cancellationToken);
+        if (motorista is null)
+            return Result<ViagemResponse>.Failure(Error.NotFound("Motorista_NAO_ENCONTRADO", "Motorista não encontrado."));
+
+        if (!motorista.Ativo)
+            return Result<ViagemResponse>.Failure(Error.Validation("MOTORISTA_INATIVO", "Não é possível alocar um motorista inativo a uma viagem."));
+
+        if (viagem.ViagemVans.Any(vv => vv.MotoristaUsuarioId == request.MotoristaId))
+            return Result<ViagemResponse>.Failure(Error.Validation("MOTORISTA_JA_ALOCADO", "Este motorista já está alocado nesta viagem."));
+
+        var viagemVan = new ViagemVan(viagemId, request.VanId);
+        viagemVan.AlocarMotorista(request.MotoristaId);
+
+        viagem.AdicionarViagemVan(viagemVan);
+
+        await _viagemRepo.UnitOfWork.SaveChangesAsync(cancellationToken);
+
+        var response = _mapper.Map<ViagemResponse>(viagem);
+        return Result<ViagemResponse>.Success(response);
+    }
+
+    
 
 }

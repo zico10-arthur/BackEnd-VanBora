@@ -13,4 +13,10 @@ public interface IViagemService
     Task<Result<ViagemResponse>> AlocarVanAsync(Guid gerenteUsuarioId, Guid viagemId, AlocarVanRequest request, CancellationToken cancellationToken = default);
     Task<Result<bool>> RemoverVanAsync(Guid gerenteUsuarioId, Guid viagemId, Guid viagemVanId, CancellationToken cancellationToken = default);
     Task<Result<bool>> CancelarAsync(Guid gerenteUsuarioId, Guid viagemId, CancellationToken cancellationToken = default);
+
+     Task<Result<ViagemResponse>> AlocarMotoristaAsync(
+        Guid gerenteUsuarioId,
+        Guid viagemId,
+        AlocarMotoristaRequest request,
+        CancellationToken cancellationToken = default);
 }

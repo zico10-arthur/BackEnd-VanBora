@@ -47,6 +47,10 @@ builder.Services.AddAuthorization();
 // ── AutoMapper ──────────────────────────────────────────────────
 builder.Services.AddAutoMapper(typeof(VanProfile).Assembly);
 builder.Services.AddAutoMapper(typeof(MotoristaProfile).Assembly);
+builder.Services.AddAutoMapper(typeof(ViagemProfile).Assembly);
+builder.Services.AddAutoMapper(typeof(ReservaProfile).Assembly);
+
+
 
 
 // ── Application Services ────────────────────────────────────────
@@ -71,6 +75,9 @@ builder.Services.AddScoped<IValidator<AtualizarViagemRequest>, AtualizarViagemVa
 builder.Services.AddScoped<IValidator<AlocarVanRequest>, AlocarVanValidator>();
 builder.Services.AddScoped<IValidator<RegistrarMotoristaRequest>, RegistrarMotoristaValidator>();
 builder.Services.AddScoped<IValidator<CriarReservaRequest>, CriarReservaValidator>();
+builder.Services.AddScoped<IValidator<AlocarMotoristaRequest>, AlocarMotoristaValidator>();
+
+
 
 
 // ── Infrastructure ──────────────────────────────────────────────

@@ -69,4 +69,20 @@ public class ViagensController : ControllerBase
 
         return Ok(result.Value.Vans);
     }
+
+    [HttpPost("{viagemId:guid}/alocarmotorista")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ViagemResponse), StatusCodes.Status200OK)] 
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+
+    public async Task<IActionResult> AlocarMotorista([FromRoute] Guid viagemId, [FromQuery] Guid gerenteid,[FromBody] AlocarMotoristaRequest request, CancellationToken cancellationToken = default)
+    {
+        var result = await _viagemService.AlocarMotoristaAsync(gerenteid, viagemId, request, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
 }
