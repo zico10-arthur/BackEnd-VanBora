@@ -304,6 +304,36 @@ public class ViagemService : IViagemService
         return Result<ViagemResponse>.Success(response);
     }
 
+     public async Task<Result<bool>> RemoverMotoristaAsync(
+        Guid gerenteUsuarioId,
+        Guid viagemId,
+        Guid viagemVanId,
+        CancellationToken cancellationToken = default)
+    {
+        var viagem = await _viagemRepo.GetByIdAsync(viagemId, cancellationToken);
+        if (viagem is null)
+            return Result<bool>.Failure(Error.NotFound("VIAGEM_NAO_ENCONTRADA", "Viagem não encontrada."));
+
+        if (viagem.GerenteUsuarioId != gerenteUsuarioId)
+            return Result<bool>.Failure(Error.Forbidden("ACESSO_NEGADO", "Você não tem permissão para alterar esta viagem."));
+
+        if (viagem.Status != StatusViagem.Agendada)
+            return Result<bool>.Failure(Error.Validation("STATUS_INVALIDO", "Apenas viagens agendadas podem ter motoristas removidos."));
+
+        var viagemVan = viagem.ViagemVans.FirstOrDefault(vv => vv.Id == viagemVanId);
+        if (viagemVan is null)
+            return Result<bool>.Failure(Error.NotFound("MOTORISTA_NAO_ALOCADO", "Não existe vínculo entre viagem e van."));
+        if (viagemVan.MotoristaUsuarioId == null) return Result<bool>.Failure(Error.Validation("MOTORISTA_NAO_ENCONTRADO", "Esta van já não possui nenhum motorista alocado nesta viagem."));
+
+        
+
+        viagemVan.DesalocarMotorista();
+
+        await _viagemRepo.UnitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result<bool>.Success(true);
+    }
+
     
 
 }

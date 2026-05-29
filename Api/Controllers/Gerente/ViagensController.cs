@@ -157,6 +157,40 @@ public class ViagensController : ControllerBase
         return Ok(result.Value);
     }
 
+    [HttpPost("{viagemId:guid}/alocarmotorista")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ViagemResponse), StatusCodes.Status200OK)] 
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+
+    public async Task<IActionResult> AlocarMotorista([FromRoute] Guid viagemId, [FromQuery] Guid gerenteid,[FromBody] AlocarMotoristaRequest request, CancellationToken cancellationToken = default)
+    {
+        var result = await _viagemService.AlocarMotoristaAsync(gerenteid, viagemId, request, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+     [HttpDelete("{viagemId:guid}/remover-motorista/{viagemVanId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
+    public async Task<IActionResult> RemoverMotorista([FromRoute] Guid viagemId, [FromQuery] Guid gerenteid, [FromRoute] Guid viagemVanId, CancellationToken cancellationToken = default)
+    {
+        var result = await _viagemService.RemoverMotoristaAsync(gerenteid, viagemId, viagemVanId, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+
+
+
     private Guid ObterGerenteId()
     {
         var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value

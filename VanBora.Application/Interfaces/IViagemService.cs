@@ -19,4 +19,9 @@ public interface IViagemService
         Guid viagemId,
         AlocarMotoristaRequest request,
         CancellationToken cancellationToken = default);
+    Task<Result<bool>> RemoverMotoristaAsync(
+        Guid gerenteUsuarioId,
+        Guid viagemId,
+        Guid viagemVanId,
+        CancellationToken cancellationToken = default);
 }
