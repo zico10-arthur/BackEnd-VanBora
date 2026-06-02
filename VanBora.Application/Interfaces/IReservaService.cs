@@ -18,4 +18,9 @@ public interface IReservaService
         Guid usuarioId,
         Guid reservaId,
         CancellationToken cancellationToken = default);
+
+    Task<Result<ContatoGerenteResponse>> ObterContatoGerenteAsync(
+        Guid usuarioId,
+        Guid reservaId,
+        CancellationToken cancellationToken = default);
 }

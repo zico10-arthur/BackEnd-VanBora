@@ -44,6 +44,14 @@ public class ViagemVanRepository : IViagemVanRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<List<ViagemVan>> GetByMotoristaIdAsync(Guid motoristaId, CancellationToken cancellationToken = default)
+    {
+        return await _context.ViagemVans
+            .Include(vv => vv.Viagem)
+            .Where(vv => vv.MotoristaUsuarioId == motoristaId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(ViagemVan viagemVan, CancellationToken cancellationToken = default)
     {
         await _context.ViagemVans.AddAsync(viagemVan, cancellationToken);

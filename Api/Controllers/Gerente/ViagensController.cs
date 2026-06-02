@@ -157,15 +157,21 @@ public class ViagensController : ControllerBase
         return Ok(result.Value);
     }
 
-    [HttpPost("{viagemId:guid}/alocarmotorista")]
-    [AllowAnonymous]
-    [ProducesResponseType(typeof(ViagemResponse), StatusCodes.Status200OK)] 
+    /// <summary>
+    ///     Aloca um motorista a uma van da viagem.
+    /// </summary>
+    [HttpPost("{viagemId:guid}/alocar-motorista/{viagemVanId:guid}")]
+    [ProducesResponseType(typeof(ViagemResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-
-    public async Task<IActionResult> AlocarMotorista([FromRoute] Guid viagemId, [FromQuery] Guid gerenteid,[FromBody] AlocarMotoristaRequest request, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> AlocarMotorista(
+        Guid viagemId,
+        Guid viagemVanId,
+        [FromBody] AlocarMotoristaRequest request,
+        CancellationToken cancellationToken = default)
     {
-        var result = await _viagemService.AlocarMotoristaAsync(gerenteid, viagemId, request, cancellationToken);
+        var gerenteId = ObterGerenteId();
+        var result = await _viagemService.AlocarMotoristaAsync(gerenteId, viagemId, request, cancellationToken);
 
         if (result.IsFailure)
             return new ObjectResult(result);
@@ -173,14 +179,20 @@ public class ViagensController : ControllerBase
         return Ok(result.Value);
     }
 
-     [HttpDelete("{viagemId:guid}/remover-motorista/{viagemVanId:guid}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    /// <summary>
+    ///     Remove a alocação de um motorista de uma van da viagem.
+    /// </summary>
+    [HttpDelete("{viagemId:guid}/remover-motorista/{viagemVanId:guid}")]
+    [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
-    public async Task<IActionResult> RemoverMotorista([FromRoute] Guid viagemId, [FromQuery] Guid gerenteid, [FromRoute] Guid viagemVanId, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> RemoverMotorista(
+        Guid viagemId,
+        Guid viagemVanId,
+        CancellationToken cancellationToken = default)
     {
-        var result = await _viagemService.RemoverMotoristaAsync(gerenteid, viagemId, viagemVanId, cancellationToken);
+        var gerenteId = ObterGerenteId();
+        var result = await _viagemService.RemoverMotoristaAsync(gerenteId, viagemId, viagemVanId, cancellationToken);
 
         if (result.IsFailure)
             return new ObjectResult(result);

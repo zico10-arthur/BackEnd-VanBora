@@ -53,6 +53,14 @@ public class UsuarioRepository : IUsuarioRepository
             .CountAsync(u => u.Tipo == tipo, cancellationToken);
     }
 
+    public async Task<List<Usuario>> GetMotoristasByGerenteIdAsync(Guid gerenteId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Usuarios
+            .Where(u => u.Tipo == TipoUsuario.Motorista
+                        && u.CriadoPorUsuarioId == gerenteId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Usuario usuario, CancellationToken cancellationToken = default)
     {
         await _context.Usuarios.AddAsync(usuario, cancellationToken);

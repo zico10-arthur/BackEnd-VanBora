@@ -18,8 +18,9 @@ public class RegistrarMotoristaValidator : AbstractValidator<RegistrarMotoristaR
             .WithMessage("CPF é obrigatório.");
 
         RuleFor(x => x.Telefone)
-            .NotEmpty()
-            .WithMessage("Telefone é obrigatório.");
+            .Matches(@"^\d{10,11}$")
+            .When(x => !string.IsNullOrWhiteSpace(x.Telefone))
+            .WithMessage("Telefone deve ter 10 ou 11 dígitos (DDD + número).");
 
         RuleFor(x => x.Cnh)
             .NotEmpty()

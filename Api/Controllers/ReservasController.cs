@@ -80,6 +80,27 @@ public class ReservasController : ControllerBase
         return Ok(result.Value);
     }
 
+    /// <summary>
+    ///     Obtém o contato do gerente para reservas de viagens que possuem ingresso (PossuiIngresso = true).
+    ///     Retorna o telefone do gerente para que o passageiro possa combinar a compra do ingresso diretamente.
+    /// </summary>
+    [HttpGet("{reservaId:guid}/contato-gerente")]
+    [ProducesResponseType(typeof(ContatoGerenteResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ObterContatoGerente(
+        Guid reservaId,
+        CancellationToken cancellationToken)
+    {
+        var usuarioId = ObterUsuarioId();
+        var result = await _reservaService.ObterContatoGerenteAsync(usuarioId, reservaId, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
     private Guid ObterUsuarioId()
     {
         var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);

@@ -220,4 +220,32 @@ public class ReservaService : IReservaService
         var response = _mapper.Map<ReservaResponse>(reserva);
         return Result<ReservaResponse>.Success(response);
     }
+
+    public async Task<Result<ContatoGerenteResponse>> ObterContatoGerenteAsync(
+        Guid usuarioId,
+        Guid reservaId,
+        CancellationToken cancellationToken = default)
+    {
+        var reserva = await _reservaRepo.GetByIdAsync(reservaId, cancellationToken);
+
+        if (reserva is null)
+            return Result<ContatoGerenteResponse>.Failure(
+                Error.NotFound("RESERVA_NAO_ENCONTRADA", "Reserva não encontrada."));
+
+        if (reserva.UsuarioId != usuarioId)
+            return Result<ContatoGerenteResponse>.Failure(
+                Error.Forbidden("ACESSO_NEGADO", "Você não tem permissão para visualizar esta reserva."));
+
+        if (reserva.Status != StatusReserva.Confirmada)
+            return Result<ContatoGerenteResponse>.Failure(
+                Error.Validation("RESERVA_NAO_CONFIRMADA", "O contato do gerente só fica disponível após a confirmação do pagamento."));
+
+        var viagem = reserva.ViagemVan.Viagem;
+
+        return Result<ContatoGerenteResponse>.Success(new ContatoGerenteResponse
+        {
+            Telefone = viagem.GerenteUsuario.Telefone?.ToString(),
+            PossuiIngresso = viagem.PossuiIngresso
+        });
+    }
 }

@@ -15,11 +15,12 @@ namespace Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
-    private readonly IMotoristaService _motorista;
+    private readonly IMotoristaService _motoristaService;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IMotoristaService motoristaService)
     {
         _authService = authService;
+        _motoristaService = motoristaService;
     }
 
     /// <summary>
@@ -269,20 +270,85 @@ public class AuthController : ControllerBase
 
         return Guid.Parse(sub);
     }
+    /// <summary>
+    ///     Cadastra um novo motorista vinculado ao gerente autenticado.
+    /// </summary>
     [HttpPost("motorista/registrar")]
-    [AllowAnonymous]
-    [ProducesResponseType(typeof(RegistrarGerenteResponse), StatusCodes.Status201Created)]
+    [Authorize]
+    [ProducesResponseType(typeof(RegistrarMotoristaResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> RegistrarMotorista(
-        [FromBody] RegistrarMotoristaRequest request,Guid gerenteid,
+        [FromBody] RegistrarMotoristaRequest request,
         CancellationToken ct)
     {
-        var result = await _motorista.RegistrarMotorista(gerenteid, request, ct);
+        var gerenteId = ObterUsuarioId();
+        var result = await _motoristaService.RegistrarMotorista(gerenteId, request, ct);
 
         if (result.IsFailure)
             return new ObjectResult(result);
 
         return Created(string.Empty, result.Value);
+    }
+
+    /// <summary>
+    ///     Lista todos os motoristas do gerente autenticado.
+    /// </summary>
+    [HttpGet("motoristas")]
+    [Authorize]
+    [ProducesResponseType(typeof(List<RegistrarMotoristaResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListarMotoristas(CancellationToken ct)
+    {
+        var gerenteId = ObterUsuarioId();
+        var result = await _motoristaService.ListarMotoristas(gerenteId, ct);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    ///     Atualiza os dados de um motorista.
+    /// </summary>
+    [HttpPut("motorista/{motoristaId:guid}")]
+    [Authorize]
+    [ProducesResponseType(typeof(RegistrarMotoristaResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AtualizarMotorista(
+        Guid motoristaId,
+        [FromBody] RegistrarMotoristaRequest request,
+        CancellationToken ct)
+    {
+        var gerenteId = ObterUsuarioId();
+        var result = await _motoristaService.AtualizarMotorista(gerenteId, motoristaId, request, ct);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    ///     Remove um motorista (soft delete).
+    ///     Só é permitido se o motorista não estiver alocado em viagens futuras.
+    /// </summary>
+    [HttpDelete("motorista/{motoristaId:guid}")]
+    [Authorize]
+    [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoverMotorista(
+        Guid motoristaId,
+        CancellationToken ct)
+    {
+        var gerenteId = ObterUsuarioId();
+        var result = await _motoristaService.RemoverMotorista(gerenteId, motoristaId, ct);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
     }
 }
