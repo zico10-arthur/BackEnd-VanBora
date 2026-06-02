@@ -1,0 +1,27 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=SEU_HOST;Port=5432;Database=vanbora;Username=...;Password=..."
+  },
+  "JwtSettings": {
+    "SecretKey": "GERE_UMA_CHAVE_FORTE_SO_PARA_PRODUCAO",
+    "Issuer": "VanBora",
+    "Audience": "VanBora.Api",
+    "ExpiracaoHoras": 8
+  },
+  "Cors": {
+    "AllowedOrigins": ["https://seu-dominio.com.br"]
+  },
+  "MercadoPago": {
+    "AccessToken": "APP_USR-...-CREDENCIAL_DE_PRODUCAO-NO_PAINEL_MP",
+    "PublicKey": "APP_USR-...-PUBLIC_KEY_PRODUCAO",
+    "NotificationUrl": "https://api.seu-dominio.com.br/api/webhooks/pix",
+    "WebhookSecret": "secret-do-webhook-de-producao",
+    "SuccessUrl": "https://seu-dominio.com.br/reserva/sucesso",
+    "FailureUrl": "https://seu-dominio.com.br/reserva/falha",
+    "PendingUrl": "https://seu-dominio.com.br/reserva/pendente"
+  },
+  "MercadoPagoOAuth": {
+    "ClientId": "SEU_CLIENT_ID",
+    "ClientSecret": "NAO_COMMITAR_USE_ENV_OU_SECRETS"
+  }
+}

@@ -9,6 +9,8 @@ public interface IReservaRepository
     Task<List<Reserva>> GetByViagemVanIdAsync(Guid viagemVanId, CancellationToken cancellationToken = default);
     Task<List<Reserva>> GetByViagemIdAsync(Guid viagemId, CancellationToken cancellationToken = default);
     Task<List<int>> GetAssentosOcupadosAsync(Guid viagemVanId, CancellationToken cancellationToken = default);
+    Task<List<Reserva>> GetExpiraveisAsync(CancellationToken cancellationToken = default);
+    Task<int> CountReservasConfirmadasPorGerenteAsync(Guid gerenteUsuarioId, CancellationToken cancellationToken = default);
     Task AddAsync(Reserva reserva, CancellationToken cancellationToken = default);
     void Update(Reserva reserva);
 }

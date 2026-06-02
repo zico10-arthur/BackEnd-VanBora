@@ -6,6 +6,11 @@
 # dotenv files
 .env
 
+# Secrets locais da API (ngrok, webhook secret, produção local)
+**/appsettings.*.local.json
+!**/appsettings.*.local.json.example
+**/appsettings.Production.json
+
 # User-specific files
 *.rsuser
 *.suo

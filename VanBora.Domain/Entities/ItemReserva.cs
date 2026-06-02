@@ -44,4 +44,10 @@ public class ItemReserva
         TelefonePassageiro = telefonePassageiro;
         CPFPassageiro = cpfPassageiro;
     }
+
+    internal void VincularReserva(Guid reservaId)
+    {
+        Guard.AgainstEmptyGuid(reservaId, nameof(reservaId));
+        ReservaId = reservaId;
+    }
 }

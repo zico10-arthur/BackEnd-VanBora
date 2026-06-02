@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  ::selection {
+    @apply bg-van-amber/35 text-white;
+  }
+}
+
+@layer utilities {
+  .vb-cta-gold {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      0 4px 16px rgba(240, 165, 0, 0.35);
+  }
+
+  .vb-cta-gold:hover {
+    animation: vb-cta-pulse 1.25s ease-in-out infinite;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      0 0 28px rgba(240, 165, 0, 0.55),
+      0 8px 28px rgba(0, 0, 0, 0.45);
+  }
+
+  .vb-seat-dead {
+    background-color: #2a2a2a;
+    background-image:
+      repeating-linear-gradient(
+        -22deg,
+        rgba(255, 255, 255, 0.04) 0px,
+        rgba(255, 255, 255, 0.04) 1px,
+        transparent 1px,
+        transparent 4px
+      ),
+      linear-gradient(155deg, #383838 0%, #2a2a2a 42%, #1c1c1c 100%);
+    box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.65);
+  }
+
+  .vb-seat-neon {
+    box-shadow:
+      0 0 0 1px rgba(255, 220, 140, 0.55),
+      0 0 14px rgba(240, 165, 0, 0.95),
+      0 0 32px rgba(240, 165, 0, 0.65),
+      0 0 48px rgba(240, 165, 0, 0.35);
+    filter: drop-shadow(0 0 10px rgba(240, 165, 0, 0.9));
+  }
+
+  .vb-text-gradient {
+    @apply bg-gradient-to-r from-[#ffe08a] via-van-amber to-[#c77d08] bg-clip-text text-transparent;
+  }
+}
+
+@keyframes vb-check-pop {
+  0% {
+    transform: scale(0.82);
+    opacity: 0.65;
+  }
+  70% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes vb-confirm-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes vb-cta-pulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      0 0 22px rgba(240, 165, 0, 0.45),
+      0 6px 22px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      0 0 32px rgba(240, 165, 0, 0.65),
+      0 10px 28px rgba(0, 0, 0, 0.45);
+  }
+}
