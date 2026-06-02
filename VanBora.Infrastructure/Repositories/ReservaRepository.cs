@@ -64,6 +64,25 @@ public class ReservaRepository : IReservaRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, List<int>>> GetAssentosOcupadosPorViagemVansAsync(
+        IReadOnlyCollection<Guid> viagemVanIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (viagemVanIds.Count == 0)
+            return new Dictionary<Guid, List<int>>();
+
+        var pares = await _context.ItemReservas
+            .Where(i =>
+                viagemVanIds.Contains(i.Reserva.ViagemVanId) &&
+                StatusAssentoOcupado.Contains(i.Reserva.Status))
+            .Select(i => new { i.Reserva.ViagemVanId, i.NumeroAssento })
+            .ToListAsync(cancellationToken);
+
+        return pares
+            .GroupBy(x => x.ViagemVanId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.NumeroAssento).Distinct().ToList());
+    }
+
     public async Task<List<Reserva>> GetExpiraveisAsync(CancellationToken cancellationToken = default)
     {
         var agora = DateTime.UtcNow;

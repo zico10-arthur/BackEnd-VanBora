@@ -24,6 +24,9 @@ public class ViagemPublicService : IViagemPublicService
     public async Task<Result<List<ViagemPublicaResponse>>> ListarDisponiveisAsync(CancellationToken ct = default)
     {
         var viagens = await _viagemRepo.GetDisponiveisAsync(ct);
+        var viagemVanIds = viagens.SelectMany(v => v.ViagemVans.Select(vv => vv.Id)).ToList();
+        var ocupacaoPorVan = await _reservaRepo.GetAssentosOcupadosPorViagemVansAsync(viagemVanIds, ct);
+
         var lista = new List<ViagemPublicaResponse>();
 
         foreach (var viagem in viagens)
@@ -31,7 +34,8 @@ public class ViagemPublicService : IViagemPublicService
             var vans = new List<ViagemVanPublicaResponse>();
             foreach (var vv in viagem.ViagemVans)
             {
-                var ocupados = await _reservaRepo.GetAssentosOcupadosAsync(vv.Id, ct);
+                ocupacaoPorVan.TryGetValue(vv.Id, out var ocupados);
+                ocupados ??= [];
                 var cap = vv.ObterQuantidadeAssentosParaReserva();
                 vans.Add(new ViagemVanPublicaResponse
                 {

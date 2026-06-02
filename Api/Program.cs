@@ -91,6 +91,7 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddHostedService<ExpirarReservasBackgroundService>();
 builder.Services.AddHostedService<DevDataSeeder>();
+builder.Services.AddScoped<Api.Services.MercadoPagoWebhookHandler>();
 
 var app = builder.Build();
 

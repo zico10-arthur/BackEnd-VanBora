@@ -55,7 +55,7 @@ public class MercadoPagoPagamentoGateway : IPagamentoGateway
                     title = titulo,
                     quantity = 1,
                     currency_id = "BRL",
-                    unit_price = (double)valorTotal
+                    unit_price = valorTotal
                 }
             },
             external_reference = reservaId.ToString(),

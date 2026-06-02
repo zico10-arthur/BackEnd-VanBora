@@ -1,3 +1,4 @@
+using System.Data;
 using FluentValidation;
 using VanBora.Application.DTOs.Reservas;
 using VanBora.Application.Interfaces;
@@ -50,16 +51,12 @@ public class ReservaService : IReservaService
         if (viagemVan.Viagem.Status != StatusViagem.Agendada)
             return Error.Validation("VIAGEM_INDISPONIVEL", "Esta viagem não aceita novas reservas.");
 
-        var assentosOcupados = await _reservaRepo.GetAssentosOcupadosAsync(request.ViagemVanId, ct);
         var maxAssentos = viagemVan.ObterQuantidadeAssentosParaReserva();
 
         foreach (var item in request.Itens)
         {
             if (item.NumeroAssento > maxAssentos)
                 return Error.Validation("ASSENTO_INVALIDO", $"Assento {item.NumeroAssento} não existe nesta van.");
-
-            if (assentosOcupados.Contains(item.NumeroAssento))
-                return Error.Conflict("ASSENTO_OCUPADO", $"Assento {item.NumeroAssento} já está ocupado.");
         }
 
         var duplicados = request.Itens.GroupBy(i => i.NumeroAssento).Where(g => g.Count() > 1).ToList();
@@ -105,8 +102,28 @@ public class ReservaService : IReservaService
             reserva.AdicionarItem(item);
         }
 
-        await _reservaRepo.AddAsync(reserva, ct);
-        await _unitOfWork.SaveChangesAsync(ct);
+        await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        try
+        {
+            var assentosOcupados = await _reservaRepo.GetAssentosOcupadosAsync(request.ViagemVanId, ct);
+            foreach (var item in request.Itens)
+            {
+                if (assentosOcupados.Contains(item.NumeroAssento))
+                {
+                    await _unitOfWork.RollbackAsync(ct);
+                    return Error.Conflict("ASSENTO_OCUPADO", $"Assento {item.NumeroAssento} já está ocupado.");
+                }
+            }
+
+            await _reservaRepo.AddAsync(reserva, ct);
+            await _unitOfWork.SaveChangesAsync(ct);
+            await _unitOfWork.CommitAsync(ct);
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync(ct);
+            throw;
+        }
 
         return MapearResposta(reserva);
     }

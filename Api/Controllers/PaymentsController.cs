@@ -1,7 +1,6 @@
+using Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using VanBora.Application.Interfaces;
-using VanBora.Infrastructure.Services;
 
 namespace Api.Controllers;
 
@@ -13,28 +12,15 @@ namespace Api.Controllers;
 [Route("api/[controller]")]
 public class PaymentsController : ControllerBase
 {
-    private readonly IReservaService _reservaService;
-    private readonly ILogger<PaymentsController> _logger;
+    private readonly MercadoPagoWebhookHandler _handler;
 
-    public PaymentsController(IReservaService reservaService, ILogger<PaymentsController> logger)
+    public PaymentsController(MercadoPagoWebhookHandler handler)
     {
-        _reservaService = reservaService;
-        _logger = logger;
+        _handler = handler;
     }
 
     [HttpPost("webhook")]
     [AllowAnonymous]
-    public async Task<IActionResult> Webhook(CancellationToken cancellationToken)
-    {
-        using var reader = new StreamReader(Request.Body);
-        var body = await reader.ReadToEndAsync(cancellationToken);
-        _logger.LogInformation("MercadoPago webhook (payments): {Body}", body);
-
-        var resourceId = MercadoPagoPagamentoGateway.ExtrairIdNotificacao(body, Request.Query["id"].FirstOrDefault());
-        if (string.IsNullOrEmpty(resourceId))
-            return BadRequest();
-
-        var result = await _reservaService.ProcessarWebhookPagamentoAsync(resourceId, cancellationToken);
-        return result.IsFailure ? StatusCode(500) : Ok();
-    }
+    public Task<IActionResult> Webhook(CancellationToken cancellationToken) =>
+        _handler.ProcessAsync(Request, cancellationToken);
 }

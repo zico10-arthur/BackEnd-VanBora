@@ -1,3 +1,4 @@
+using System.Data;
 using VanBora.Domain.Interfaces;
 using VanBora.Infrastructure.Data;
 
@@ -17,10 +18,11 @@ public class UnitOfWork : IUnitOfWork
         return await _context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
-    {
-        await _context.BeginTransactionAsync(cancellationToken);
-    }
+    public Task BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+        BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+
+    public Task BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken = default) =>
+        _context.BeginTransactionAsync(isolationLevel, cancellationToken);
 
     public async Task CommitAsync(CancellationToken cancellationToken = default)
     {

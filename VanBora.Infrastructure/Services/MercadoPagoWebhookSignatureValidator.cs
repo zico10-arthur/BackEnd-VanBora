@@ -8,6 +8,8 @@ namespace VanBora.Infrastructure.Services;
 /// </summary>
 public static class MercadoPagoWebhookSignatureValidator
 {
+    private static readonly TimeSpan MaxTimestampSkew = TimeSpan.FromMinutes(10);
+
     public static bool TryValidate(
         string? xSignatureHeader,
         string? xRequestId,
@@ -24,9 +26,17 @@ public static class MercadoPagoWebhookSignatureValidator
             string.IsNullOrEmpty(v1))
             return false;
 
+        if (!long.TryParse(ts, out var tsSeconds))
+            return false;
+
+        var eventTime = DateTimeOffset.FromUnixTimeSeconds(tsSeconds);
+        var skew = DateTimeOffset.UtcNow - eventTime;
+        if (skew < TimeSpan.Zero || skew > MaxTimestampSkew)
+            return false;
+
         var manifest = $"id:{dataId};request-id:{xRequestId ?? ""};ts:{ts};";
         var computed = ComputeHmacHex(webhookSecret, manifest);
-        return FixedTimeEquals(computed, v1);
+        return FixedTimeEquals(computed, v1.Trim().ToLowerInvariant());
     }
 
     private static bool TryParseSignatureHeader(string header, out string? ts, out string? v1)
