@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using VanBora.Domain.Entities;
 using VanBora.Domain.Interfaces;
@@ -8,21 +9,22 @@ namespace VanBora.Infrastructure.Data;
 public class AppDbContext : DbContext, IUnitOfWork
 {
     public DbSet<Usuario> Usuarios => Set<Usuario>();
+    public DbSet<Van> Vans => Set<Van>();
+    public DbSet<Viagem> Viagens => Set<Viagem>();
+    public DbSet<ViagemVan> ViagemVans => Set<ViagemVan>();
+    public DbSet<Reserva> Reservas => Set<Reserva>();
+    public DbSet<ItemReserva> ItemReservas => Set<ItemReserva>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Evita descoberta transitiva de Van/Viagem/Reserva até existirem configurações dedicadas.
-        modelBuilder.Ignore<Van>();
-        modelBuilder.Ignore<Viagem>();
-        modelBuilder.Ignore<ViagemVan>();
-        modelBuilder.Ignore<ItemReserva>();
-        modelBuilder.Ignore<Reserva>();
-
         modelBuilder.ApplyConfiguration(new UsuarioConfiguration());
-
-        // Demais configurações (Van, Viagem, etc.) serão adicionadas em Sprints futuras
+        modelBuilder.ApplyConfiguration(new VanConfiguration());
+        modelBuilder.ApplyConfiguration(new ViagemConfiguration());
+        modelBuilder.ApplyConfiguration(new ViagemVanConfiguration());
+        modelBuilder.ApplyConfiguration(new ReservaConfiguration());
+        modelBuilder.ApplyConfiguration(new ItemReservaConfiguration());
     }
 
     // Implementação de IUnitOfWork
@@ -31,9 +33,12 @@ public class AppDbContext : DbContext, IUnitOfWork
         return await base.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
+    public Task BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+        BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+
+    public async Task BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken = default)
     {
-        await Database.BeginTransactionAsync(cancellationToken);
+        await Database.BeginTransactionAsync(isolationLevel, cancellationToken);
     }
 
     public async Task CommitAsync(CancellationToken cancellationToken = default)

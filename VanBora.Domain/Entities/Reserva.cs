@@ -56,12 +56,14 @@ public class Reserva
     {
         Guard.AgainstNull(item, nameof(item));
 
+        item.VincularReserva(Id);
         _itens.Add(item);
     }
 
     public void ConfirmarPagamento(string transacaoId)
     {
         Guard.AgainstInvalidState(Status == StatusReserva.PendentePagamento, "Apenas reservas pendentes de pagamento podem ser confirmadas.");
+        Guard.AgainstInvalidState(!EstaExpirada(), "Reserva expirada.");
         Guard.AgainstNullOrWhiteSpace(transacaoId, nameof(transacaoId));
 
         Status = StatusReserva.Confirmada;
@@ -103,4 +105,19 @@ public class Reserva
     {
         return Status == StatusReserva.PendentePagamento && DateTime.UtcNow >= ExpiraEm;
     }
+
+    public decimal ValorAPagar() => ValorTotal + TaxaPlataforma;
+
+    public void DefinirLinkPagamento(string initPoint, string? preferenciaId = null)
+    {
+        Guard.AgainstInvalidState(Status == StatusReserva.PendentePagamento, "Apenas reservas pendentes podem receber link de pagamento.");
+        Guard.AgainstInvalidState(!EstaExpirada(), "Reserva expirada.");
+        Guard.AgainstNullOrWhiteSpace(initPoint, nameof(initPoint));
+
+        CodigoPix = initPoint;
+        if (!string.IsNullOrWhiteSpace(preferenciaId))
+            TransacaoId = preferenciaId;
+    }
+
+    public const string CodigoPixPendente = "PENDENTE";
 }

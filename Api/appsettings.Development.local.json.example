@@ -1,0 +1,17 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5433;Database=vanbora;Username=postgres;Password=sua-senha"
+  },
+  "JwtSettings": {
+    "SecretKey": "chave-jwt-dev-com-pelo-menos-32-caracteres"
+  },
+  "MercadoPago": {
+    "AccessToken": "APP_USR-...-credencial-de-TESTE",
+    "NotificationUrl": "https://SEU_TUNEL.ngrok-free.app/api/webhooks/pix",
+    "WebhookSecret": "cole-o-secret-gerado-no-painel-mp-webhooks"
+  },
+  "MercadoPagoSandbox": {
+    "TestBuyerUser": "TESTUSER...",
+    "TestBuyerPassword": "senha-do-comprador-teste-mp"
+  }
+}

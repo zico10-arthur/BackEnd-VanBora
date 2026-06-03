@@ -1,9 +1,13 @@
+using System.Data;
+
 namespace VanBora.Domain.Interfaces;
 
 public interface IUnitOfWork
 {
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     Task BeginTransactionAsync(CancellationToken cancellationToken = default);
+
+    Task BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken = default);
     Task CommitAsync(CancellationToken cancellationToken = default);
     Task RollbackAsync(CancellationToken cancellationToken = default);
 }

@@ -1,6 +1,47 @@
 @Api_HostAddress = http://localhost:5151
+@token = {{login.response.body.token}}
 
-GET {{Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Login
+# @name login
+POST {{Api_HostAddress}}/api/auth/login
+Content-Type: application/json
 
-###
+{
+  "email": "passageiro@email.com",
+  "senha": "Senha@123"
+}
+
+### Criar reserva (requer viagem_van no banco)
+POST {{Api_HostAddress}}/api/reservas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "viagemVanId": "00000000-0000-0000-0000-000000000001",
+  "itens": [
+    {
+      "numeroAssento": 1,
+      "nomePassageiro": "João Silva",
+      "emailPassageiro": "joao@email.com",
+      "telefonePassageiro": "21999999999",
+      "cpfPassageiro": "12345678909"
+    }
+  ]
+}
+
+### Gerar pagamento Mercado Pago (retorna initPoint)
+POST {{Api_HostAddress}}/api/reservas/{{reservaId}}/pagar
+Authorization: Bearer {{token}}
+
+### Minhas reservas
+GET {{Api_HostAddress}}/api/reservas/minhas
+Authorization: Bearer {{token}}
+
+### Webhook Mercado Pago (simulação — use id real de pagamento)
+POST {{Api_HostAddress}}/api/webhooks/pix?id=PAYMENT_ID
+Content-Type: application/json
+
+{
+  "type": "payment",
+  "data": { "id": "PAYMENT_ID" }
+}
