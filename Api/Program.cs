@@ -3,6 +3,7 @@ using Api.Middleware;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using VanBora.Application.DTOs.Admin;
 using VanBora.Application.DTOs.Auth;
 using VanBora.Application.DTOs.Reservas;
 using VanBora.Application.DTOs.Vans;
@@ -62,6 +63,7 @@ builder.Services.AddScoped<IViagemService, ViagemService>();
 builder.Services.AddScoped<IReservaService, ReservaService>();
 builder.Services.AddScoped<IRelatorioService, RelatorioService>();
 builder.Services.AddScoped<IMotoristaService, MotoristaService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 
 
 // ── Validators ──────────────────────────────────────────────────
@@ -76,6 +78,8 @@ builder.Services.AddScoped<IValidator<AlocarVanRequest>, AlocarVanValidator>();
 builder.Services.AddScoped<IValidator<RegistrarMotoristaRequest>, RegistrarMotoristaValidator>();
 builder.Services.AddScoped<IValidator<CriarReservaRequest>, CriarReservaValidator>();
 builder.Services.AddScoped<IValidator<AlocarMotoristaRequest>, AlocarMotoristaValidator>();
+builder.Services.AddScoped<IValidator<AtualizarGerenteAdminRequest>, AtualizarGerenteAdminValidator>();
+builder.Services.AddScoped<IValidator<CriarGerenteAdminRequest>, CriarGerenteAdminValidator>();
 
 
 

@@ -86,6 +86,12 @@ public class ReservaRepository : IReservaRepository
                   r.Status == StatusReserva.EmAndamento), cancellationToken);
     }
 
+    public async Task<int> GetCountByUsuarioIdAsync(Guid usuarioId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Reservas
+            .CountAsync(r => r.UsuarioId == usuarioId, cancellationToken);
+    }
+
     public async Task AddAsync(Reserva reserva, CancellationToken cancellationToken = default)
     {
         await _context.Reservas.AddAsync(reserva, cancellationToken);

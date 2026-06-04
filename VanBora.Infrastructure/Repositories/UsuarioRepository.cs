@@ -61,6 +61,52 @@ public class UsuarioRepository : IUsuarioRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<List<Usuario>> GetGerentesAsync(
+        string? search,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Usuarios
+            .Where(u => u.Tipo == TipoUsuario.Gerente);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(u =>
+                EF.Functions.ILike(u.Nome, $"%{search}%") ||
+                (u.Slug != null && EF.Functions.ILike(u.Slug, $"%{search}%")));
+        }
+
+        return await query
+            .OrderByDescending(u => u.CriadoEm)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<Usuario>> SearchAllAsync(
+        string? search,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Usuarios.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            // Se o termo for composto apenas por dígitos, busca por CPF exato
+            if (search.All(char.IsDigit) && search.Length == 11)
+            {
+                query = query.Where(u =>
+                    u.CPF.Valor == search ||
+                    EF.Functions.ILike(u.Nome, $"%{search}%"));
+            }
+            else
+            {
+                query = query.Where(u =>
+                    EF.Functions.ILike(u.Nome, $"%{search}%"));
+            }
+        }
+
+        return await query
+            .OrderByDescending(u => u.CriadoEm)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Usuario usuario, CancellationToken cancellationToken = default)
     {
         await _context.Usuarios.AddAsync(usuario, cancellationToken);

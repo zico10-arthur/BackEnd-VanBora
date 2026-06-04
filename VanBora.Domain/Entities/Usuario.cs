@@ -210,6 +210,19 @@ public class Usuario
         DataAtualizacao = DateTime.UtcNow;
     }
 
+    public void AtualizarParametrosGerente(decimal? taxaPlataforma, bool? gratuito)
+    {
+        Guard.AgainstInvalidState(Tipo == TipoUsuario.Gerente, "Apenas Gerentes possuem taxa.");
+        if (taxaPlataforma.HasValue)
+        {
+            Guard.AgainstNegative(taxaPlataforma.Value, nameof(taxaPlataforma));
+            TaxaPlataforma = taxaPlataforma.Value;
+        }
+        if (gratuito.HasValue)
+            Gratuito = gratuito.Value;
+        DataAtualizacao = DateTime.UtcNow;
+    }
+
     public void DefinirCodigoExclusao(string codigo, DateTime expiraEm)
     {
         Guard.AgainstNullOrWhiteSpace(codigo, nameof(codigo));
