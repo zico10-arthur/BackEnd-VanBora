@@ -1,5 +1,6 @@
 using System.Text;
 using Api.Middleware;
+using Api.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -45,6 +46,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+// ── Mercado Pago Settings ──────────────────────────────────────
+builder.Services.Configure<MercadoPagoSettings>(
+    builder.Configuration.GetSection(MercadoPagoSettings.SectionName));
+
 // ── AutoMapper ──────────────────────────────────────────────────
 builder.Services.AddAutoMapper(typeof(VanProfile).Assembly);
 builder.Services.AddAutoMapper(typeof(MotoristaProfile).Assembly);
@@ -64,6 +69,8 @@ builder.Services.AddScoped<IReservaService, ReservaService>();
 builder.Services.AddScoped<IRelatorioService, RelatorioService>();
 builder.Services.AddScoped<IMotoristaService, MotoristaService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<IViagemPublicService, ViagemPublicService>();
+builder.Services.AddScoped<MercadoPagoWebhookHandler>();
 
 
 // ── Validators ──────────────────────────────────────────────────
@@ -86,6 +93,10 @@ builder.Services.AddScoped<IValidator<CriarGerenteAdminRequest>, CriarGerenteAdm
 
 // ── Infrastructure ──────────────────────────────────────────────
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// ── Hosted Services ──────────────────────────────────────────────
+builder.Services.AddHostedService<ExpirarReservasBackgroundService>();
+builder.Services.AddHostedService<DevDataSeeder>();
 
 // ── Controllers + Swagger (Swashbuckle) ─────────────────────────
 // Evitar Microsoft.AspNetCore.OpenApi no mesmo projeto: conflito de Microsoft.OpenApi em runtime com Swashbuckle.

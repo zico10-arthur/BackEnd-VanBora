@@ -75,6 +75,25 @@ public class ReservaRepository : IReservaRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<Dictionary<Guid, List<int>>> GetAssentosOcupadosPorViagemVansAsync(List<Guid> viagemVanIds, CancellationToken cancellationToken = default)
+    {
+        if (viagemVanIds.Count == 0)
+            return new Dictionary<Guid, List<int>>();
+
+        return await _context.ItensReserva
+            .AsNoTracking()
+            .Where(i =>
+                viagemVanIds.Contains(i.Reserva!.ViagemVanId) &&
+                (i.Reserva.Status == StatusReserva.PendentePagamento ||
+                 i.Reserva.Status == StatusReserva.Confirmada) &&
+                i.Reserva.ExpiraEm >= DateTime.UtcNow)
+            .GroupBy(i => i.Reserva!.ViagemVanId)
+            .ToDictionaryAsync(
+                g => g.Key,
+                g => g.Select(i => i.NumeroAssento).Distinct().ToList(),
+                cancellationToken);
+    }
+
     public async Task<bool> HasReservasAtivasByUsuarioIdAsync(Guid usuarioId, CancellationToken cancellationToken = default)
     {
         return await _context.Reservas
@@ -90,6 +109,15 @@ public class ReservaRepository : IReservaRepository
     {
         return await _context.Reservas
             .CountAsync(r => r.UsuarioId == usuarioId, cancellationToken);
+    }
+
+    public async Task<List<Reserva>> GetReservasPendentesExpiradasAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Reservas
+            .Where(r =>
+                r.Status == StatusReserva.PendentePagamento &&
+                r.ExpiraEm < DateTime.UtcNow)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task AddAsync(Reserva reserva, CancellationToken cancellationToken = default)

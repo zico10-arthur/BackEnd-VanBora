@@ -17,19 +17,22 @@ public class ReservaService : IReservaService
     private readonly IValidator<CriarReservaRequest> _validator;
     private readonly IMapper _mapper;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPagamentoGateway _pagamentoGateway;
 
     public ReservaService(
         IReservaRepository reservaRepo,
         IViagemVanRepository viagemVanRepo,
         IValidator<CriarReservaRequest> validator,
         IMapper mapper,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IPagamentoGateway pagamentoGateway)
     {
         _reservaRepo = reservaRepo;
         _viagemVanRepo = viagemVanRepo;
         _validator = validator;
         _mapper = mapper;
         _unitOfWork = unitOfWork;
+        _pagamentoGateway = pagamentoGateway;
     }
 
     public async Task<Result<ReservaResponse>> CriarReservaAsync(
@@ -247,5 +250,45 @@ public class ReservaService : IReservaService
             Telefone = viagem.GerenteUsuario.Telefone?.ToString(),
             PossuiIngresso = viagem.PossuiIngresso
         });
+    }
+
+    public async Task<Result> ProcessarWebhookPagamentoAsync(
+        string paymentId,
+        CancellationToken cancellationToken = default)
+    {
+        var pagamentoResult = await _pagamentoGateway.ObterPagamentoAsync(paymentId, cancellationToken);
+        if (pagamentoResult.IsFailure)
+            return Result.Failure(pagamentoResult.Error!);
+
+        var info = pagamentoResult.Value;
+        if (info.Status != "approved")
+            return Result.Success();
+
+        if (string.IsNullOrWhiteSpace(info.ExternalReference) ||
+            !Guid.TryParse(info.ExternalReference, out var reservaId))
+            return Error.Validation("RESERVA_ID_INVALIDO", "External reference inválido no pagamento.");
+
+        var reserva = await _reservaRepo.GetByIdAsync(reservaId, cancellationToken);
+        if (reserva is null)
+            return Error.NotFound("RESERVA_NAO_ENCONTRADA", "Reserva não encontrada para o pagamento.");
+
+        reserva.ConfirmarPagamento(info.PaymentId);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result.Success();
+    }
+
+    public async Task ExpirarReservasPendentesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var reservasExpiradas = await _reservaRepo.GetReservasPendentesExpiradasAsync(cancellationToken);
+
+        foreach (var reserva in reservasExpiradas)
+        {
+            reserva.ExpiracaoAutomatica();
+        }
+
+        if (reservasExpiradas.Count > 0)
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 using VanBora.Domain.Entities;
 using VanBora.Domain.Interfaces;
 using VanBora.Infrastructure.Data.Configurations;
@@ -35,6 +36,11 @@ public class AppDbContext : DbContext, IUnitOfWork
     public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
         await Database.BeginTransactionAsync(cancellationToken);
+    }
+
+    public async Task BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken = default)
+    {
+        await Database.BeginTransactionAsync(isolationLevel, cancellationToken);
     }
 
     public async Task CommitAsync(CancellationToken cancellationToken = default)

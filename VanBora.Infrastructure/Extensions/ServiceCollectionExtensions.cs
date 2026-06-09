@@ -32,6 +32,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IEmailService, EmailService>();
 
+        // Gateways
+        services.AddHttpClient<IPagamentoGateway, MercadoPagoPagamentoGateway>();
+
         return services;
     }
 }

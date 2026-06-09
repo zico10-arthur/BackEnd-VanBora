@@ -23,4 +23,11 @@ public interface IReservaService
         Guid usuarioId,
         Guid reservaId,
         CancellationToken cancellationToken = default);
+
+    Task<Result> ProcessarWebhookPagamentoAsync(
+        string paymentId,
+        CancellationToken cancellationToken = default);
+
+    Task ExpirarReservasPendentesAsync(
+        CancellationToken cancellationToken = default);
 }

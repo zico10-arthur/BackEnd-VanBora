@@ -60,9 +60,10 @@ public class DevDataSeeder : IHostedService
                 DateTime.UtcNow.AddDays(14).AddHours(-3),
                 "Shopping Nova América — saída 14h",
                 89.90m,
-                true);
+                true,
+                quorumMinimo: 10);
 
-            var viagemVan = new ViagemVan(viagem.Id, van);
+            var viagemVan = new ViagemVan(viagem.Id, van.Id);
             viagem.AdicionarViagemVan(viagemVan);
 
             await db.Viagens.AddAsync(viagem, cancellationToken);
