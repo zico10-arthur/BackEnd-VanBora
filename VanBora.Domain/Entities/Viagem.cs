@@ -14,6 +14,7 @@ public class Viagem
     public string LocalPartida { get; private set; }
     public decimal PrecoAssento { get; private set; }
     public bool PossuiIngresso { get; private set; }
+    public int QuorumMinimo { get; private set; }
     public StatusViagem Status { get; private set; }
     public DateTime CriadoEm { get; private set; }
 
@@ -34,14 +35,16 @@ public class Viagem
         DateTime dataPartida,
         string localPartida,
         decimal precoAssento,
-        bool possuiIngresso)
+        bool possuiIngresso,
+        int quorumMinimo)
     {
         Guard.AgainstEmptyGuid(gerenteUsuarioId, nameof(gerenteUsuarioId));
         Guard.AgainstNullOrWhiteSpace(nomeEvento, nameof(nomeEvento));
         Guard.AgainstNullOrWhiteSpace(localEvento, nameof(localEvento));
         Guard.AgainstNullOrWhiteSpace(localPartida, nameof(localPartida));
         Guard.AgainstNegativeOrZero(precoAssento, nameof(precoAssento));
-        Guard.AgainstInvalidState(dataPartida < dataEvento, "Data de partida deve ser anterior à data do evento.");
+        Guard.AgainstNegativeOrZero(quorumMinimo, nameof(quorumMinimo));
+        Guard.AgainstInvalidState(dataPartida >= dataEvento, "Data de partida deve ser anterior à data do evento.");
 
         Id = Guid.NewGuid();
         GerenteUsuarioId = gerenteUsuarioId;
@@ -52,6 +55,7 @@ public class Viagem
         LocalPartida = localPartida;
         PrecoAssento = precoAssento;
         PossuiIngresso = possuiIngresso;
+        QuorumMinimo = quorumMinimo;
         Status = StatusViagem.Agendada;
         CriadoEm = DateTime.UtcNow;
     }
@@ -62,42 +66,39 @@ public class Viagem
         string localEvento,
         DateTime dataPartida,
         string localPartida,
-        decimal precoAssento,
         bool possuiIngresso)
     {
         Guard.AgainstNullOrWhiteSpace(nomeEvento, nameof(nomeEvento));
         Guard.AgainstNullOrWhiteSpace(localEvento, nameof(localEvento));
         Guard.AgainstNullOrWhiteSpace(localPartida, nameof(localPartida));
-        Guard.AgainstNegativeOrZero(precoAssento, nameof(precoAssento));
-        Guard.AgainstInvalidState(dataPartida < dataEvento, "Data de partida deve ser anterior à data do evento.");
+        Guard.AgainstInvalidState(dataPartida >= dataEvento, "Data de partida deve ser anterior à data do evento.");
 
         NomeEvento = nomeEvento;
         DataEvento = dataEvento;
         LocalEvento = localEvento;
         DataPartida = dataPartida;
         LocalPartida = localPartida;
-        PrecoAssento = precoAssento;
         PossuiIngresso = possuiIngresso;
     }
 
     public void Iniciar()
     {
-        Guard.AgainstInvalidState(Status == StatusViagem.Agendada, "Apenas viagens agendadas podem ser iniciadas.");
+        Guard.AgainstInvalidState(Status != StatusViagem.Agendada, "Apenas viagens agendadas podem ser iniciadas.");
 
         Status = StatusViagem.EmAndamento;
     }
 
     public void Concluir()
     {
-        Guard.AgainstInvalidState(Status == StatusViagem.EmAndamento, "Apenas viagens em andamento podem ser concluídas.");
+        Guard.AgainstInvalidState(Status != StatusViagem.EmAndamento, "Apenas viagens em andamento podem ser concluídas.");
 
         Status = StatusViagem.Concluida;
     }
 
     public void Cancelar()
     {
-        Guard.AgainstInvalidState(Status != StatusViagem.Concluida, "Viagem já concluída não pode ser cancelada.");
-        Guard.AgainstInvalidState(Status != StatusViagem.Cancelada, "Viagem já está cancelada.");
+        Guard.AgainstInvalidState(Status == StatusViagem.Concluida, "Viagem já concluída não pode ser cancelada.");
+        Guard.AgainstInvalidState(Status == StatusViagem.Cancelada, "Viagem já está cancelada.");
 
         Status = StatusViagem.Cancelada;
     }
@@ -108,4 +109,14 @@ public class Viagem
 
         _viagemVans.Add(viagemVan);
     }
+
+    public void RemoverViagemVan(ViagemVan viagemVan)
+    {
+        Guard.AgainstNull(viagemVan, nameof(viagemVan));
+        Guard.AgainstInvalidState(Status != StatusViagem.Agendada, "Apenas viagens agendadas podem ter vans removidas.");
+
+        _viagemVans.Remove(viagemVan);
+    }
+
+ 
 }

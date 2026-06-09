@@ -5,11 +5,22 @@ namespace VanBora.Application.Interfaces;
 
 public interface IReservaService
 {
-    Task<Result<ReservaResponse>> CriarAsync(Guid usuarioId, CriarReservaRequest request, CancellationToken ct = default);
-    Task<Result<PagarReservaResponse>> GerarPagamentoAsync(Guid usuarioId, Guid reservaId, CancellationToken ct = default);
-    Task<Result<ReservaResponse>> ObterPorIdAsync(Guid usuarioId, Guid reservaId, CancellationToken ct = default);
-    Task<Result<List<ReservaResponse>>> ListarMinhasAsync(Guid usuarioId, CancellationToken ct = default);
-    Task<Result<ReservaResponse>> CancelarAsync(Guid usuarioId, Guid reservaId, CancellationToken ct = default);
-    Task<Result> ProcessarWebhookPagamentoAsync(string paymentId, CancellationToken ct = default);
-    Task ExpirarReservasPendentesAsync(CancellationToken ct = default);
+    Task<Result<ReservaResponse>> CriarReservaAsync(
+        Guid usuarioId,
+        CriarReservaRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<List<ReservaResponse>>> ListarMinhasReservasAsync(
+        Guid usuarioId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<ReservaResponse>> ObterReservaPorIdAsync(
+        Guid usuarioId,
+        Guid reservaId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<ContatoGerenteResponse>> ObterContatoGerenteAsync(
+        Guid usuarioId,
+        Guid reservaId,
+        CancellationToken cancellationToken = default);
 }

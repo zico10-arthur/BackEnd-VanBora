@@ -30,8 +30,8 @@ namespace VanBora.Infrastructure.Migrations
 
                     b.Property<string>("NomePassageiro")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("nome_passageiro");
 
                     b.Property<int>("NumeroAssento")
@@ -46,9 +46,9 @@ namespace VanBora.Infrastructure.Migrations
 
                     b.HasIndex("ReservaId", "NumeroAssento")
                         .IsUnique()
-                        .HasDatabaseName("ix_item_reservas_reserva_assento");
+                        .HasDatabaseName("ix_itens_reserva_reserva_id_assento");
 
-                    b.ToTable("item_reservas", (string)null);
+                    b.ToTable("itens_reserva", (string)null);
                 });
 
             modelBuilder.Entity("VanBora.Domain.Entities.Reserva", b =>
@@ -59,8 +59,8 @@ namespace VanBora.Infrastructure.Migrations
 
                     b.Property<string>("CodigoPix")
                         .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
                         .HasColumnName("codigo_pix");
 
                     b.Property<DateTime>("CriadoEm")
@@ -77,13 +77,12 @@ namespace VanBora.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("status");
 
                     b.Property<decimal>("TaxaPlataforma")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasColumnType("decimal(10,2)")
                         .HasColumnName("taxa_plataforma");
 
                     b.Property<string>("TransacaoId")
@@ -96,8 +95,7 @@ namespace VanBora.Infrastructure.Migrations
                         .HasColumnName("usuario_id");
 
                     b.Property<decimal>("ValorTotal")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasColumnType("decimal(10,2)")
                         .HasColumnName("valor_total");
 
                     b.Property<Guid>("ViagemVanId")
@@ -106,14 +104,9 @@ namespace VanBora.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UsuarioId")
-                        .HasDatabaseName("ix_reservas_usuario_id");
+                    b.HasIndex("UsuarioId");
 
-                    b.HasIndex("ViagemVanId")
-                        .HasDatabaseName("ix_reservas_viagem_van_id");
-
-                    b.HasIndex("Status", "ExpiraEm")
-                        .HasDatabaseName("ix_reservas_status_expira");
+                    b.HasIndex("ViagemVanId");
 
                     b.ToTable("reservas", (string)null);
                 });
@@ -134,6 +127,15 @@ namespace VanBora.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("chave_pix");
+
+                    b.Property<string>("CodigoExclusao")
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasColumnName("codigo_exclusao");
+
+                    b.Property<DateTime?>("CodigoExclusaoExpiraEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("codigo_exclusao_expira_em");
 
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone")
@@ -197,7 +199,9 @@ namespace VanBora.Infrastructure.Migrations
                         .HasColumnName("id");
 
                     b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
+                        .HasDefaultValue(true)
                         .HasColumnName("ativo");
 
                     b.Property<int>("Capacidade")
@@ -255,14 +259,14 @@ namespace VanBora.Infrastructure.Migrations
 
                     b.Property<string>("LocalEvento")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
                         .HasColumnName("local_evento");
 
                     b.Property<string>("LocalPartida")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
                         .HasColumnName("local_partida");
 
                     b.Property<string>("NomeEvento")
@@ -276,9 +280,12 @@ namespace VanBora.Infrastructure.Migrations
                         .HasColumnName("possui_ingresso");
 
                     b.Property<decimal>("PrecoAssento")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasColumnType("decimal(10,2)")
                         .HasColumnName("preco_assento");
+
+                    b.Property<int>("QuorumMinimo")
+                        .HasColumnType("integer")
+                        .HasColumnName("quorum_minimo");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -317,7 +324,9 @@ namespace VanBora.Infrastructure.Migrations
 
                     b.HasIndex("VanId");
 
-                    b.HasIndex("ViagemId");
+                    b.HasIndex("ViagemId", "VanId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_viagem_vans_viagem_id_van_id");
 
                     b.ToTable("viagem_vans", (string)null);
                 });
@@ -343,7 +352,7 @@ namespace VanBora.Infrastructure.Migrations
 
                             b1.HasKey("ItemReservaId");
 
-                            b1.ToTable("item_reservas");
+                            b1.ToTable("itens_reserva");
 
                             b1.WithOwner()
                                 .HasForeignKey("ItemReservaId");
@@ -362,7 +371,7 @@ namespace VanBora.Infrastructure.Migrations
 
                             b1.HasKey("ItemReservaId");
 
-                            b1.ToTable("item_reservas");
+                            b1.ToTable("itens_reserva");
 
                             b1.WithOwner()
                                 .HasForeignKey("ItemReservaId");
@@ -377,17 +386,17 @@ namespace VanBora.Infrastructure.Migrations
                                 .IsRequired()
                                 .HasMaxLength(2)
                                 .HasColumnType("character varying(2)")
-                                .HasColumnName("telefone_ddd");
+                                .HasColumnName("telefone_passageiro_ddd");
 
                             b1.Property<string>("Numero")
                                 .IsRequired()
                                 .HasMaxLength(9)
                                 .HasColumnType("character varying(9)")
-                                .HasColumnName("telefone_numero");
+                                .HasColumnName("telefone_passageiro_valor");
 
                             b1.HasKey("ItemReservaId");
 
-                            b1.ToTable("item_reservas");
+                            b1.ToTable("itens_reserva");
 
                             b1.WithOwner()
                                 .HasForeignKey("ItemReservaId");
@@ -398,20 +407,13 @@ namespace VanBora.Infrastructure.Migrations
                             b1.Property<Guid>("ItemReservaId")
                                 .HasColumnType("uuid");
 
-                            b1.Property<string>("Moeda")
-                                .IsRequired()
-                                .HasMaxLength(3)
-                                .HasColumnType("character varying(3)")
-                                .HasColumnName("preco_moeda");
-
                             b1.Property<decimal>("Valor")
-                                .HasPrecision(18, 2)
-                                .HasColumnType("numeric(18,2)")
-                                .HasColumnName("preco_assento");
+                                .HasColumnType("decimal(10,2)")
+                                .HasColumnName("preco_assento_valor");
 
                             b1.HasKey("ItemReservaId");
 
-                            b1.ToTable("item_reservas");
+                            b1.ToTable("itens_reserva");
 
                             b1.WithOwner()
                                 .HasForeignKey("ItemReservaId");
@@ -581,6 +583,10 @@ namespace VanBora.Infrastructure.Migrations
                                 .HasColumnName("placa");
 
                             b1.HasKey("VanId");
+
+                            b1.HasIndex("Valor")
+                                .IsUnique()
+                                .HasDatabaseName("ix_vans_placa");
 
                             b1.ToTable("vans");
 

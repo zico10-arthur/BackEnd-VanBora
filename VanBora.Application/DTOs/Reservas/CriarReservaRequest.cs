@@ -1,16 +1,12 @@
 namespace VanBora.Application.DTOs.Reservas;
 
-public sealed class CriarReservaRequest
-{
-    public Guid ViagemVanId { get; init; }
-    public List<ItemReservaRequest> Itens { get; init; } = [];
-}
+public record CriarReservaRequest(
+    Guid ViagemVanId,
+    List<ItemReservaRequest> Itens);
 
-public sealed class ItemReservaRequest
-{
-    public int NumeroAssento { get; init; }
-    public string NomePassageiro { get; init; } = string.Empty;
-    public string EmailPassageiro { get; init; } = string.Empty;
-    public string TelefonePassageiro { get; init; } = string.Empty;
-    public string CpfPassageiro { get; init; } = string.Empty;
-}
+public record ItemReservaRequest(
+    int NumeroAssento,
+    string NomePassageiro,
+    string EmailPassageiro,
+    string TelefonePassageiro,
+    string CpfPassageiro);

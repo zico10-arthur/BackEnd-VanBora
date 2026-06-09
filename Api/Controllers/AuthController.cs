@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VanBora.Application.DTOs.Auth;
@@ -14,10 +15,12 @@ namespace Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IMotoristaService _motoristaService;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IMotoristaService motoristaService)
     {
         _authService = authService;
+        _motoristaService = motoristaService;
     }
 
     /// <summary>
@@ -30,6 +33,7 @@ public class AuthController : ControllerBase
     ///     ou o status HTTP correspondente ao erro via <see cref="Middleware.ResultFilter" />.
     /// </returns>
     [HttpPost("gerente/registrar")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(RegistrarGerenteResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -98,6 +102,151 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    ///     Atualiza os dados do perfil do usuário autenticado (US18).
+    /// </summary>
+    /// <param name="request">Dados a serem atualizados (nome, email, telefone, chavePix, CNH).</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>
+    ///     200 OK com os dados atualizados,
+    ///     ou o status HTTP correspondente ao erro via <see cref="Middleware.ResultFilter" />.
+    /// </returns>
+    [HttpPut("usuario")]
+    [Authorize]
+    [ProducesResponseType(typeof(AtualizarUsuarioResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> AtualizarUsuario(
+        [FromBody] AtualizarUsuarioRequest request,
+        CancellationToken cancellationToken)
+    {
+        var usuarioId = ObterUsuarioId();
+        var result = await _authService.AtualizarUsuarioAsync(usuarioId, request, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    ///     Altera a senha do usuário autenticado (US21).
+    /// </summary>
+    /// <param name="request">Senha atual e nova senha.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>
+    ///     200 OK com mensagem de sucesso,
+    ///     ou 401 se a senha atual estiver incorreta,
+    ///     ou 404 se o usuário não for encontrado.
+    /// </returns>
+    [HttpPost("alterar-senha")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AlterarSenha(
+        [FromBody] AlterarSenhaRequest request,
+        CancellationToken cancellationToken)
+    {
+        var usuarioId = ObterUsuarioId();
+        var result = await _authService.AlterarSenhaAsync(usuarioId, request, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(new { mensagem = result.Value });
+    }
+
+    /// <summary>
+    ///     Atualiza o slug do gerente autenticado (US19).
+    /// </summary>
+    /// <param name="request">Novo slug.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>
+    ///     200 OK com os dados atualizados do usuário,
+    ///     ou 403 se não for gerente,
+    ///     ou 409 se o slug já estiver em uso.
+    /// </returns>
+    [HttpPut("slug")]
+    [Authorize]
+    [ProducesResponseType(typeof(AtualizarUsuarioResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> AtualizarSlug(
+        [FromBody] AtualizarSlugRequest request,
+        CancellationToken cancellationToken)
+    {
+        var usuarioId = ObterUsuarioId();
+        var result = await _authService.AtualizarSlugAsync(usuarioId, request, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    ///     Solicita a exclusão da conta do usuário autenticado (US20).
+    ///     Um código de 6 dígitos é enviado para o email cadastrado.
+    /// </summary>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>
+    ///     200 OK com mensagem de sucesso,
+    ///     ou 404 se o usuário não for encontrado,
+    ///     ou 409 se a conta já estiver desativada ou houver reservas ativas.
+    /// </returns>
+    [HttpPost("solicitar-exclusao")]
+    [Authorize]
+    [ProducesResponseType(typeof(SolicitarExclusaoResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> SolicitarExclusao(
+        CancellationToken cancellationToken)
+    {
+        var usuarioId = ObterUsuarioId();
+        var result = await _authService.SolicitarExclusaoAsync(usuarioId, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    ///     Confirma a exclusão da conta com o código recebido por email (US20).
+    /// </summary>
+    /// <param name="request">Código de 6 dígitos enviado por email.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>
+    ///     200 OK com mensagem de sucesso (conta desativada),
+    ///     ou 400 se o código for inválido/expirado,
+    ///     ou 404 se o usuário não for encontrado.
+    /// </returns>
+    [HttpPost("confirmar-exclusao")]
+    [Authorize]
+    [ProducesResponseType(typeof(ConfirmarExclusaoResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ConfirmarExclusao(
+        [FromBody] ConfirmarExclusaoRequest request,
+        CancellationToken cancellationToken)
+    {
+        var usuarioId = ObterUsuarioId();
+        var result = await _authService.ConfirmarExclusaoAsync(usuarioId, request, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     ///     Converte <see cref="Error" /> do cadastro de passageiro em resposta HTTP explícita (US03 / Dev 4).
     /// </summary>
     private IActionResult MapearFalhaRegistrarPassageiro(Error error)
@@ -113,4 +262,93 @@ public class AuthController : ControllerBase
     }
 
     private sealed record ErrorResponse(string Code, string Message);
+
+    private Guid ObterUsuarioId()
+    {
+        var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? throw new UnauthorizedAccessException("Usuário não autenticado.");
+
+        return Guid.Parse(sub);
+    }
+    /// <summary>
+    ///     Cadastra um novo motorista vinculado ao gerente autenticado.
+    /// </summary>
+    [HttpPost("motorista/registrar")]
+    [Authorize]
+    [ProducesResponseType(typeof(RegistrarMotoristaResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RegistrarMotorista(
+        [FromBody] RegistrarMotoristaRequest request,
+        CancellationToken ct)
+    {
+        var gerenteId = ObterUsuarioId();
+        var result = await _motoristaService.RegistrarMotorista(gerenteId, request, ct);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Created(string.Empty, result.Value);
+    }
+
+    /// <summary>
+    ///     Lista todos os motoristas do gerente autenticado.
+    /// </summary>
+    [HttpGet("motoristas")]
+    [Authorize]
+    [ProducesResponseType(typeof(List<RegistrarMotoristaResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListarMotoristas(CancellationToken ct)
+    {
+        var gerenteId = ObterUsuarioId();
+        var result = await _motoristaService.ListarMotoristas(gerenteId, ct);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    ///     Atualiza os dados de um motorista.
+    /// </summary>
+    [HttpPut("motorista/{motoristaId:guid}")]
+    [Authorize]
+    [ProducesResponseType(typeof(RegistrarMotoristaResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AtualizarMotorista(
+        Guid motoristaId,
+        [FromBody] RegistrarMotoristaRequest request,
+        CancellationToken ct)
+    {
+        var gerenteId = ObterUsuarioId();
+        var result = await _motoristaService.AtualizarMotorista(gerenteId, motoristaId, request, ct);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    ///     Remove um motorista (soft delete).
+    ///     Só é permitido se o motorista não estiver alocado em viagens futuras.
+    /// </summary>
+    [HttpDelete("motorista/{motoristaId:guid}")]
+    [Authorize]
+    [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoverMotorista(
+        Guid motoristaId,
+        CancellationToken ct)
+    {
+        var gerenteId = ObterUsuarioId();
+        var result = await _motoristaService.RemoverMotorista(gerenteId, motoristaId, ct);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
 }

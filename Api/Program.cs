@@ -3,21 +3,19 @@ using Api.Middleware;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using VanBora.Application.DTOs.Admin;
 using VanBora.Application.DTOs.Auth;
-using Api.Services;
+using VanBora.Application.DTOs.Reservas;
+using VanBora.Application.DTOs.Vans;
+using VanBora.Application.DTOs.Viagens;
 using VanBora.Application.Interfaces;
+using VanBora.Application.Mappings;
 using VanBora.Application.Services;
 using VanBora.Application.Settings;
 using VanBora.Application.Validators;
 using VanBora.Infrastructure.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Overrides locais (gitignored): appsettings.Development.local.json — webhook/ngrok, etc.
-builder.Configuration.AddJsonFile(
-    $"appsettings.{builder.Environment.EnvironmentName}.local.json",
-    optional: true,
-    reloadOnChange: true);
 
 // ── JWT Settings ────────────────────────────────────────────────
 var jwtSection = builder.Configuration.GetSection(JwtSettings.SectionName);
@@ -47,36 +45,44 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-var corsSection = builder.Configuration.GetSection(CorsSettings.SectionName);
-builder.Services.Configure<CorsSettings>(corsSection);
-var corsOrigins = corsSection.Get<CorsSettings>()?.AllowedOrigins
-    ?? ["http://localhost:3000"];
+// ── AutoMapper ──────────────────────────────────────────────────
+builder.Services.AddAutoMapper(typeof(VanProfile).Assembly);
+builder.Services.AddAutoMapper(typeof(MotoristaProfile).Assembly);
+builder.Services.AddAutoMapper(typeof(ViagemProfile).Assembly);
+builder.Services.AddAutoMapper(typeof(ReservaProfile).Assembly);
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins(corsOrigins)
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
-    });
-});
+
+
 
 // ── Application Services ────────────────────────────────────────
 builder.Services.AddScoped<IUsuarioService, UsuarioService>();
 builder.Services.AddScoped<ILoginService, LoginService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IVanService, VanService>();
+builder.Services.AddScoped<IViagemService, ViagemService>();
 builder.Services.AddScoped<IReservaService, ReservaService>();
-builder.Services.AddScoped<IViagemPublicService, ViagemPublicService>();
+builder.Services.AddScoped<IRelatorioService, RelatorioService>();
+builder.Services.AddScoped<IMotoristaService, MotoristaService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 
-builder.Services.Configure<MercadoPagoSettings>(builder.Configuration.GetSection(MercadoPagoSettings.SectionName));
 
 // ── Validators ──────────────────────────────────────────────────
 builder.Services.AddScoped<IValidator<RegistrarGerenteRequest>, RegistrarGerenteValidator>();
 builder.Services.AddScoped<IValidator<LoginRequest>, LoginValidator>();
 builder.Services.AddScoped<IValidator<RegistrarPassageiroRequest>, RegistrarPassageiroRequestValidator>();
-builder.Services.AddScoped<IValidator<VanBora.Application.DTOs.Reservas.CriarReservaRequest>, CriarReservaValidator>();
+builder.Services.AddScoped<IValidator<CriarVanRequest>, CriarVanValidator>();
+builder.Services.AddScoped<IValidator<AtualizarVanRequest>, AtualizarVanValidator>();
+builder.Services.AddScoped<IValidator<CriarViagemRequest>, CriarViagemValidator>();
+builder.Services.AddScoped<IValidator<AtualizarViagemRequest>, AtualizarViagemValidator>();
+builder.Services.AddScoped<IValidator<AlocarVanRequest>, AlocarVanValidator>();
+builder.Services.AddScoped<IValidator<RegistrarMotoristaRequest>, RegistrarMotoristaValidator>();
+builder.Services.AddScoped<IValidator<CriarReservaRequest>, CriarReservaValidator>();
+builder.Services.AddScoped<IValidator<AlocarMotoristaRequest>, AlocarMotoristaValidator>();
+builder.Services.AddScoped<IValidator<AtualizarGerenteAdminRequest>, AtualizarGerenteAdminValidator>();
+builder.Services.AddScoped<IValidator<CriarGerenteAdminRequest>, CriarGerenteAdminValidator>();
+
+
+
 
 // ── Infrastructure ──────────────────────────────────────────────
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -88,10 +94,6 @@ builder.Services.AddControllers(options =>
     options.Filters.Add<ResultFilter>();
 });
 builder.Services.AddSwaggerGen();
-
-builder.Services.AddHostedService<ExpirarReservasBackgroundService>();
-builder.Services.AddHostedService<DevDataSeeder>();
-builder.Services.AddScoped<Api.Services.MercadoPagoWebhookHandler>();
 
 var app = builder.Build();
 
@@ -105,9 +107,6 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseHttpsRedirection();
-
-// Habilitar CORS antes da autenticação/autorização
-app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();

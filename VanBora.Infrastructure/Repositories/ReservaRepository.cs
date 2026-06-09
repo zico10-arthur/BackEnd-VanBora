@@ -8,13 +8,6 @@ namespace VanBora.Infrastructure.Repositories;
 
 public class ReservaRepository : IReservaRepository
 {
-    private static readonly StatusReserva[] StatusAssentoOcupado =
-    [
-        StatusReserva.PendentePagamento,
-        StatusReserva.Confirmada,
-        StatusReserva.EmAndamento
-    ];
-
     private readonly AppDbContext _context;
 
     public ReservaRepository(AppDbContext context)
@@ -27,15 +20,25 @@ public class ReservaRepository : IReservaRepository
         return await _context.Reservas
             .Include(r => r.Itens)
             .Include(r => r.ViagemVan)
-            .ThenInclude(vv => vv.Viagem)
+                .ThenInclude(vv => vv.Van)
+            .Include(r => r.ViagemVan)
+                .ThenInclude(vv => vv.Viagem)
+                    .ThenInclude(v => v.GerenteUsuario)
+            .Include(r => r.Usuario)
             .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
     }
 
     public async Task<List<Reserva>> GetByUsuarioIdAsync(Guid usuarioId, CancellationToken cancellationToken = default)
     {
         return await _context.Reservas
-            .Include(r => r.Itens)
+            .AsNoTracking()
+            .AsSplitQuery()
             .Where(r => r.UsuarioId == usuarioId)
+            .Include(r => r.Itens)
+            .Include(r => r.ViagemVan)
+                .ThenInclude(vv => vv.Van)
+            .Include(r => r.ViagemVan)
+                .ThenInclude(vv => vv.Viagem)
             .OrderByDescending(r => r.CriadoEm)
             .ToListAsync(cancellationToken);
     }
@@ -43,6 +46,7 @@ public class ReservaRepository : IReservaRepository
     public async Task<List<Reserva>> GetByViagemVanIdAsync(Guid viagemVanId, CancellationToken cancellationToken = default)
     {
         return await _context.Reservas
+            .AsNoTracking()
             .Where(r => r.ViagemVanId == viagemVanId)
             .ToListAsync(cancellationToken);
     }
@@ -50,58 +54,42 @@ public class ReservaRepository : IReservaRepository
     public async Task<List<Reserva>> GetByViagemIdAsync(Guid viagemId, CancellationToken cancellationToken = default)
     {
         return await _context.Reservas
-            .Where(r => r.ViagemVan.ViagemId == viagemId)
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Where(r => r.ViagemVan!.ViagemId == viagemId)
+            .Include(r => r.ViagemVan)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<List<int>> GetAssentosOcupadosAsync(Guid viagemVanId, CancellationToken cancellationToken = default)
     {
-        return await _context.ItemReservas
+        return await _context.ItensReserva
+            .AsNoTracking()
             .Where(i =>
-                i.Reserva.ViagemVanId == viagemVanId &&
-                StatusAssentoOcupado.Contains(i.Reserva.Status))
+                i.Reserva!.ViagemVanId == viagemVanId &&
+                (i.Reserva.Status == StatusReserva.PendentePagamento ||
+                 i.Reserva.Status == StatusReserva.Confirmada) &&
+                i.Reserva.ExpiraEm >= DateTime.UtcNow)
             .Select(i => i.NumeroAssento)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<IReadOnlyDictionary<Guid, List<int>>> GetAssentosOcupadosPorViagemVansAsync(
-        IReadOnlyCollection<Guid> viagemVanIds,
-        CancellationToken cancellationToken = default)
-    {
-        if (viagemVanIds.Count == 0)
-            return new Dictionary<Guid, List<int>>();
-
-        var pares = await _context.ItemReservas
-            .Where(i =>
-                viagemVanIds.Contains(i.Reserva.ViagemVanId) &&
-                StatusAssentoOcupado.Contains(i.Reserva.Status))
-            .Select(i => new { i.Reserva.ViagemVanId, i.NumeroAssento })
-            .ToListAsync(cancellationToken);
-
-        return pares
-            .GroupBy(x => x.ViagemVanId)
-            .ToDictionary(g => g.Key, g => g.Select(x => x.NumeroAssento).Distinct().ToList());
-    }
-
-    public async Task<List<Reserva>> GetExpiraveisAsync(CancellationToken cancellationToken = default)
-    {
-        var agora = DateTime.UtcNow;
-        return await _context.Reservas
-            .Where(r => r.Status == StatusReserva.PendentePagamento && r.ExpiraEm <= agora)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<int> CountReservasConfirmadasPorGerenteAsync(
-        Guid gerenteUsuarioId,
-        CancellationToken cancellationToken = default)
-    {
-        return await _context.Reservas
-            .Where(r =>
-                r.Status == StatusReserva.Confirmada &&
-                r.ViagemVan.Viagem.GerenteUsuarioId == gerenteUsuarioId)
-            .Select(r => r.UsuarioId)
             .Distinct()
-            .CountAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> HasReservasAtivasByUsuarioIdAsync(Guid usuarioId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Reservas
+            .AsNoTracking()
+            .AnyAsync(r =>
+                r.UsuarioId == usuarioId &&
+                ((r.Status == StatusReserva.PendentePagamento && r.ExpiraEm >= DateTime.UtcNow) ||
+                  r.Status == StatusReserva.Confirmada ||
+                  r.Status == StatusReserva.EmAndamento), cancellationToken);
+    }
+
+    public async Task<int> GetCountByUsuarioIdAsync(Guid usuarioId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Reservas
+            .CountAsync(r => r.UsuarioId == usuarioId, cancellationToken);
     }
 
     public async Task AddAsync(Reserva reserva, CancellationToken cancellationToken = default)
@@ -111,6 +99,8 @@ public class ReservaRepository : IReservaRepository
 
     public void Update(Reserva reserva)
     {
-        _context.Reservas.Update(reserva);
+        var entry = _context.Entry(reserva);
+        if (entry.State == EntityState.Detached)
+            _context.Reservas.Update(reserva);
     }
 }

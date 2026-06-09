@@ -20,22 +20,39 @@ public class ResultFilter : IAsyncResultFilter
 
     public async Task OnResultExecutionAsync(ResultExecutingContext context, ResultExecutionDelegate next)
     {
-        if (context.Result is ObjectResult objectResult
-            && objectResult.Value is IAppResult result)
+        if (context.Result is ObjectResult objectResult)
         {
-            if (result.IsFailure)
+            var valueType = objectResult.Value?.GetType().FullName ?? "(null)";
+            _logger.LogInformation("ResultFilter: action={Action}, valueType={ValueType}, isIAppResult={IsIApp}",
+                context.ActionDescriptor.DisplayName,
+                valueType,
+                objectResult.Value is IAppResult);
+
+            if (objectResult.Value is IAppResult result)
             {
-                context.Result = MapErrorToActionResult(result.Error);
+                _logger.LogInformation("ResultFilter: Intercepted IAppResult. IsSuccess={IsSuccess}, HasValue={HasValue}, ErrorType={ErrorType}",
+                    result.IsSuccess, result.HasValue, result.IsFailure ? result.Error.Type.ToString() : "N/A");
+
+                if (result.IsFailure)
+                {
+                    var errorResult = MapErrorToActionResult(result.Error);
+                    context.Result = errorResult;
+                    await next();
+                    return;
+                }
+
+                // Success
+                context.Result = result.HasValue
+                    ? new OkObjectResult(result.GetValue())
+                    : new NoContentResult();
+
+                await next();
                 return;
             }
-
-            // Success
-            context.Result = result.HasValue
-                ? new OkObjectResult(result.GetValue())
-                : new NoContentResult();
-
-            await next();
-            return;
+        }
+        else
+        {
+            _logger.LogInformation("ResultFilter: Not an ObjectResult. Type={ResultType}", context.Result?.GetType().FullName);
         }
 
         await next();

@@ -56,14 +56,12 @@ public class Reserva
     {
         Guard.AgainstNull(item, nameof(item));
 
-        item.VincularReserva(Id);
         _itens.Add(item);
     }
 
     public void ConfirmarPagamento(string transacaoId)
     {
-        Guard.AgainstInvalidState(Status == StatusReserva.PendentePagamento, "Apenas reservas pendentes de pagamento podem ser confirmadas.");
-        Guard.AgainstInvalidState(!EstaExpirada(), "Reserva expirada.");
+        Guard.AgainstInvalidState(Status != StatusReserva.PendentePagamento, "Apenas reservas pendentes de pagamento podem ser confirmadas.");
         Guard.AgainstNullOrWhiteSpace(transacaoId, nameof(transacaoId));
 
         Status = StatusReserva.Confirmada;
@@ -73,22 +71,22 @@ public class Reserva
 
     public void Cancelar()
     {
-        Guard.AgainstInvalidState(Status != StatusReserva.Concluida, "Reserva já concluída não pode ser cancelada.");
-        Guard.AgainstInvalidState(Status != StatusReserva.Cancelada, "Reserva já está cancelada.");
+        Guard.AgainstInvalidState(Status == StatusReserva.Concluida, "Reserva já concluída não pode ser cancelada.");
+        Guard.AgainstInvalidState(Status == StatusReserva.Cancelada, "Reserva já está cancelada.");
 
         Status = StatusReserva.Cancelada;
     }
 
     public void IniciarViagem()
     {
-        Guard.AgainstInvalidState(Status == StatusReserva.Confirmada, "Apenas reservas confirmadas podem iniciar a viagem.");
+        Guard.AgainstInvalidState(Status != StatusReserva.Confirmada, "Apenas reservas confirmadas podem iniciar a viagem.");
 
         Status = StatusReserva.EmAndamento;
     }
 
     public void Concluir()
     {
-        Guard.AgainstInvalidState(Status == StatusReserva.EmAndamento, "Apenas reservas em andamento podem ser concluídas.");
+        Guard.AgainstInvalidState(Status != StatusReserva.EmAndamento, "Apenas reservas em andamento podem ser concluídas.");
 
         Status = StatusReserva.Concluida;
     }
@@ -105,19 +103,4 @@ public class Reserva
     {
         return Status == StatusReserva.PendentePagamento && DateTime.UtcNow >= ExpiraEm;
     }
-
-    public decimal ValorAPagar() => ValorTotal + TaxaPlataforma;
-
-    public void DefinirLinkPagamento(string initPoint, string? preferenciaId = null)
-    {
-        Guard.AgainstInvalidState(Status == StatusReserva.PendentePagamento, "Apenas reservas pendentes podem receber link de pagamento.");
-        Guard.AgainstInvalidState(!EstaExpirada(), "Reserva expirada.");
-        Guard.AgainstNullOrWhiteSpace(initPoint, nameof(initPoint));
-
-        CodigoPix = initPoint;
-        if (!string.IsNullOrWhiteSpace(preferenciaId))
-            TransacaoId = preferenciaId;
-    }
-
-    public const string CodigoPixPendente = "PENDENTE";
 }

@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using VanBora.Application.Interfaces;
-using VanBora.Application.Settings;
 using VanBora.Domain.Interfaces;
 using VanBora.Infrastructure.Data;
 using VanBora.Infrastructure.Repositories;
@@ -23,16 +22,15 @@ public static class ServiceCollectionExtensions
 
         // Repositories
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
-        services.AddScoped<IReservaRepository, ReservaRepository>();
+        services.AddScoped<IVanRepository, VanRepository>();
         services.AddScoped<IViagemRepository, ViagemRepository>();
         services.AddScoped<IViagemVanRepository, ViagemVanRepository>();
+        services.AddScoped<IReservaRepository, ReservaRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Services
         services.AddScoped<ITokenService, TokenService>();
-
-        services.Configure<MercadoPagoSettings>(configuration.GetSection(MercadoPagoSettings.SectionName));
-        services.AddHttpClient<IPagamentoGateway, MercadoPagoPagamentoGateway>();
+        services.AddScoped<IEmailService, EmailService>();
 
         return services;
     }

@@ -1,4 +1,4 @@
-using System.Data;
+using AutoMapper;
 using FluentValidation;
 using VanBora.Application.DTOs.Reservas;
 using VanBora.Application.Interfaces;
@@ -14,294 +14,238 @@ public class ReservaService : IReservaService
 {
     private readonly IReservaRepository _reservaRepo;
     private readonly IViagemVanRepository _viagemVanRepo;
-    private readonly IPagamentoGateway _pagamentoGateway;
+    private readonly IValidator<CriarReservaRequest> _validator;
+    private readonly IMapper _mapper;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IValidator<CriarReservaRequest> _criarValidator;
 
     public ReservaService(
         IReservaRepository reservaRepo,
         IViagemVanRepository viagemVanRepo,
-        IPagamentoGateway pagamentoGateway,
-        IUnitOfWork unitOfWork,
-        IValidator<CriarReservaRequest> criarValidator)
+        IValidator<CriarReservaRequest> validator,
+        IMapper mapper,
+        IUnitOfWork unitOfWork)
     {
         _reservaRepo = reservaRepo;
         _viagemVanRepo = viagemVanRepo;
-        _pagamentoGateway = pagamentoGateway;
+        _validator = validator;
+        _mapper = mapper;
         _unitOfWork = unitOfWork;
-        _criarValidator = criarValidator;
     }
 
-    public async Task<Result<ReservaResponse>> CriarAsync(
+    public async Task<Result<ReservaResponse>> CriarReservaAsync(
         Guid usuarioId,
         CriarReservaRequest request,
-        CancellationToken ct = default)
+        CancellationToken cancellationToken = default)
     {
-        var validacao = await _criarValidator.ValidateAsync(request, ct);
-        if (!validacao.IsValid)
+        // 1. Validar request com CriarReservaValidator
+        var validation = await _validator.ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid)
         {
-            var msg = string.Join(" ", validacao.Errors.Select(e => e.ErrorMessage));
-            return Error.Validation("VALIDACAO_DTO", msg);
+            var erros = validation.Errors
+                .Select(e => new Error(e.PropertyName, e.ErrorMessage))
+                .ToList();
+
+            return Result<ReservaResponse>.Failure(Error.Validation(erros));
         }
 
-        var viagemVan = await _viagemVanRepo.GetByIdAsync(request.ViagemVanId, ct);
+        // 2. Buscar ViagemVan por ID (incluindo Van + Viagem + GerenteUsuario)
+        var viagemVan = await _viagemVanRepo.GetByIdAsync(request.ViagemVanId, cancellationToken);
+
+        // 3. Se não encontrada → Error.NotFound
         if (viagemVan is null)
-            return Error.NotFound("VIAGEM_VAN_NAO_ENCONTRADA", "Viagem/van não encontrada.");
+            return Result<ReservaResponse>.Failure(
+                Error.NotFound("VIAGEMVAN_NAO_ENCONTRADA", "Van/Viagem não encontrada."));
 
-        if (viagemVan.Viagem.Status != StatusViagem.Agendada)
-            return Error.Validation("VIAGEM_INDISPONIVEL", "Esta viagem não aceita novas reservas.");
+        var viagem = viagemVan.Viagem;
+        var van = viagemVan.Van;
 
-        var maxAssentos = viagemVan.ObterQuantidadeAssentosParaReserva();
+        // 4. Validar que a Viagem está Agendada
+        if (viagem.Status != StatusViagem.Agendada)
+            return Result<ReservaResponse>.Failure(
+                Error.Validation("VIAGEM_NAO_AGENDADA", "A viagem não está disponível para reservas."));
 
-        foreach (var item in request.Itens)
-        {
-            if (item.NumeroAssento > maxAssentos)
-                return Error.Validation("ASSENTO_INVALIDO", $"Assento {item.NumeroAssento} não existe nesta van.");
-        }
+        // 5. Validar que a Van está Ativa
+        if (!van.Ativo)
+            return Result<ReservaResponse>.Failure(
+                Error.Validation("VAN_INATIVA", "A van selecionada não está ativa."));
 
-        var duplicados = request.Itens.GroupBy(i => i.NumeroAssento).Where(g => g.Count() > 1).ToList();
-        if (duplicados.Count > 0)
-            return Error.Validation("ASSENTO_DUPLICADO", "Não é possível reservar o mesmo assento duas vezes.");
+        // 6. Buscar assentos ocupados (apenas PendentePagamento ou Confirmada com ExpiraEm >= now)
+        var assentosOcupados = await _reservaRepo.GetAssentosOcupadosAsync(
+            request.ViagemVanId, cancellationToken);
 
-        var precoAssento = viagemVan.Viagem.PrecoAssento;
-        var valorTotal = precoAssento * request.Itens.Count;
-        var gerente = viagemVan.Viagem.GerenteUsuario;
-        var taxaPlataforma = gerente.Gratuito == true
-            ? 0m
-            : Math.Round(valorTotal * (gerente.TaxaPlataforma ?? 0m) / 100m, 2, MidpointRounding.AwayFromZero);
+        var assentosOcupadosSet = new HashSet<int>(assentosOcupados);
 
-        var reserva = new Reserva(
-            usuarioId,
-            request.ViagemVanId,
-            valorTotal,
-            taxaPlataforma,
-            Reserva.CodigoPixPendente);
+        // 7. Validar que nenhum assento solicitado está ocupado
+        var assentoOcupado = request.Itens
+            .Select(i => i.NumeroAssento)
+            .FirstOrDefault(a => assentosOcupadosSet.Contains(a));
 
-        foreach (var itemReq in request.Itens)
-        {
-            var email = Email.Criar(itemReq.EmailPassageiro);
-            if (email.IsFailure) return email.Error;
+        if (assentoOcupado != default)
+            return Result<ReservaResponse>.Failure(
+                Error.Conflict("ASSENTO_OCUPADO", $"O assento {assentoOcupado} já está ocupado."));
 
-            var telefone = Telefone.Criar(itemReq.TelefonePassageiro);
-            if (telefone.IsFailure) return telefone.Error;
+        var assentosParaReserva = viagemVan.ObterQuantidadeAssentosParaReserva();
 
-            var cpf = CPF.Criar(itemReq.CpfPassageiro);
-            if (cpf.IsFailure) return cpf.Error;
+        // 8. Validar que cada NumeroAssento <= Van.Capacidade - 1
+        var assentoInvalido = request.Itens
+            .Select(i => i.NumeroAssento)
+            .FirstOrDefault(a => a > assentosParaReserva);
 
-            var preco = Dinheiro.Criar(precoAssento);
-            if (preco.IsFailure) return preco.Error;
+        if (assentoInvalido != default)
+            return Result<ReservaResponse>.Failure(
+                Error.Validation("ASSENTO_INVALIDO", $"Assento {assentoInvalido} não existe. Os assentos disponíveis vão de 1 a {assentosParaReserva}."));
 
-            var item = new ItemReserva(
-                itemReq.NumeroAssento,
-                preco.Value,
-                itemReq.NomePassageiro.Trim(),
-                email.Value,
-                telefone.Value,
-                cpf.Value);
+        // 9. Validar que não excede capacidade disponível
+        var assentosDisponiveis = assentosParaReserva - assentosOcupadosSet.Count;
 
-            reserva.AdicionarItem(item);
-        }
+        if (request.Itens.Count > assentosDisponiveis)
+            return Result<ReservaResponse>.Failure(
+                Error.Validation("CAPACIDADE_EXCEDIDA", $"Apenas {assentosDisponiveis} assento(s) disponível(is)."));
 
-        await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        // 10. Obter TaxaPlataforma do GerenteUsuario
+        var gerente = viagem.GerenteUsuario;
+        var taxaPlataformaPercentual = gerente?.TaxaPlataforma ?? 0m;
+
+        // 11. Calcular valorTotal e taxaPlataforma
+        var valorTotal = request.Itens.Count * viagem.PrecoAssento;
+        var taxaPlataforma = valorTotal * (taxaPlataformaPercentual / 100m);
+
+        // 12. Gerar reservaId manualmente (necessário antes do codigoPix)
+        var reservaId = Guid.NewGuid();
+
+        // 13. Gerar codigoPix mock
+        var codigoPix = $"pix-mock-{reservaId:N}";
+
+        // 14. Iniciar transação
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+
         try
         {
-            var assentosOcupados = await _reservaRepo.GetAssentosOcupadosAsync(request.ViagemVanId, ct);
+            // 16. Criar entidade Reserva
+            var reserva = new Reserva(
+                usuarioId,
+                request.ViagemVanId,
+                valorTotal,
+                taxaPlataforma,
+                codigoPix);
+
+            // 17. Para cada item do request, criar ItemReserva
             foreach (var item in request.Itens)
             {
-                if (assentosOcupados.Contains(item.NumeroAssento))
+                // a. Criar Dinheiro via factory method
+                var precoAssentoResult = Dinheiro.Criar(viagem.PrecoAssento);
+                if (precoAssentoResult.IsFailure)
                 {
-                    await _unitOfWork.RollbackAsync(ct);
-                    return Error.Conflict("ASSENTO_OCUPADO", $"Assento {item.NumeroAssento} já está ocupado.");
+                    await _unitOfWork.RollbackAsync(cancellationToken);
+                    return Result<ReservaResponse>.Failure(precoAssentoResult.Error!);
                 }
+
+                // b. Converter strings para Value Objects
+                var emailResult = Email.Criar(item.EmailPassageiro);
+                if (emailResult.IsFailure)
+                {
+                    await _unitOfWork.RollbackAsync(cancellationToken);
+                    return Result<ReservaResponse>.Failure(emailResult.Error!);
+                }
+
+                var telefoneResult = Telefone.Criar(item.TelefonePassageiro);
+                if (telefoneResult.IsFailure)
+                {
+                    await _unitOfWork.RollbackAsync(cancellationToken);
+                    return Result<ReservaResponse>.Failure(telefoneResult.Error!);
+                }
+
+                var cpfResult = CPF.Criar(item.CpfPassageiro);
+                if (cpfResult.IsFailure)
+                {
+                    await _unitOfWork.RollbackAsync(cancellationToken);
+                    return Result<ReservaResponse>.Failure(cpfResult.Error!);
+                }
+
+                // c. Criar ItemReserva
+                var itemReserva = new ItemReserva(
+                    item.NumeroAssento,
+                    precoAssentoResult.Value,
+                    item.NomePassageiro,
+                    emailResult.Value,
+                    telefoneResult.Value,
+                    cpfResult.Value);
+
+                // d. Adicionar à reserva
+                reserva.AdicionarItem(itemReserva);
             }
 
-            await _reservaRepo.AddAsync(reserva, ct);
-            await _unitOfWork.SaveChangesAsync(ct);
-            await _unitOfWork.CommitAsync(ct);
+            // 18. Salvar
+            await _reservaRepo.AddAsync(reserva, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            // 19. Commitar transação
+            await _unitOfWork.CommitAsync(cancellationToken);
+
+            // 20. Mapear para ReservaResponse e retornar Success
+            var response = _mapper.Map<ReservaResponse>(reserva);
+            return Result<ReservaResponse>.Success(response);
         }
         catch
         {
-            await _unitOfWork.RollbackAsync(ct);
+            await _unitOfWork.RollbackAsync(cancellationToken);
             throw;
         }
-
-        return MapearResposta(reserva);
     }
 
-    public async Task<Result<PagarReservaResponse>> GerarPagamentoAsync(
+    public async Task<Result<List<ReservaResponse>>> ListarMinhasReservasAsync(
+        Guid usuarioId,
+        CancellationToken cancellationToken = default)
+    {
+        var reservas = await _reservaRepo.GetByUsuarioIdAsync(usuarioId, cancellationToken);
+        var response = _mapper.Map<List<ReservaResponse>>(reservas);
+        return Result<List<ReservaResponse>>.Success(response);
+    }
+
+    public async Task<Result<ReservaResponse>> ObterReservaPorIdAsync(
         Guid usuarioId,
         Guid reservaId,
-        CancellationToken ct = default)
+        CancellationToken cancellationToken = default)
     {
-        var reserva = await _reservaRepo.GetByIdAsync(reservaId, ct);
+        var reserva = await _reservaRepo.GetByIdAsync(reservaId, cancellationToken);
+
         if (reserva is null)
-            return Error.NotFound("RESERVA_NAO_ENCONTRADA", "Reserva não encontrada.");
+            return Result<ReservaResponse>.Failure(
+                Error.NotFound("RESERVA_NAO_ENCONTRADA", "Reserva não encontrada."));
 
         if (reserva.UsuarioId != usuarioId)
-            return Error.Forbidden("RESERVA_NAO_AUTORIZADA", "Esta reserva não pertence ao usuário.");
+            return Result<ReservaResponse>.Failure(
+                Error.Forbidden("ACESSO_NEGADO", "Você não tem permissão para visualizar esta reserva."));
 
-        if (reserva.Status != StatusReserva.PendentePagamento)
-            return Error.Validation("RESERVA_NAO_PENDENTE", "Reserva já confirmada ou cancelada.");
+        var response = _mapper.Map<ReservaResponse>(reserva);
+        return Result<ReservaResponse>.Success(response);
+    }
 
-        if (reserva.EstaExpirada())
+    public async Task<Result<ContatoGerenteResponse>> ObterContatoGerenteAsync(
+        Guid usuarioId,
+        Guid reservaId,
+        CancellationToken cancellationToken = default)
+    {
+        var reserva = await _reservaRepo.GetByIdAsync(reservaId, cancellationToken);
+
+        if (reserva is null)
+            return Result<ContatoGerenteResponse>.Failure(
+                Error.NotFound("RESERVA_NAO_ENCONTRADA", "Reserva não encontrada."));
+
+        if (reserva.UsuarioId != usuarioId)
+            return Result<ContatoGerenteResponse>.Failure(
+                Error.Forbidden("ACESSO_NEGADO", "Você não tem permissão para visualizar esta reserva."));
+
+        if (reserva.Status != StatusReserva.Confirmada)
+            return Result<ContatoGerenteResponse>.Failure(
+                Error.Validation("RESERVA_NAO_CONFIRMADA", "O contato do gerente só fica disponível após a confirmação do pagamento."));
+
+        var viagem = reserva.ViagemVan.Viagem;
+
+        return Result<ContatoGerenteResponse>.Success(new ContatoGerenteResponse
         {
-            reserva.ExpiracaoAutomatica();
-            _reservaRepo.Update(reserva);
-            await _unitOfWork.SaveChangesAsync(ct);
-            return Error.Validation("RESERVA_EXPIRADA", "Reserva expirada. Crie uma nova reserva.");
-        }
-
-        if (reserva.CodigoPix != Reserva.CodigoPixPendente &&
-            reserva.CodigoPix.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-        {
-            return Result<PagarReservaResponse>.Success(new PagarReservaResponse
-            {
-                Id = reserva.Id,
-                Status = reserva.Status.ToString(),
-                InitPoint = reserva.CodigoPix,
-                PreferenceId = reserva.TransacaoId ?? string.Empty,
-                ValorAPagar = reserva.ValorAPagar(),
-                ExpiraEm = reserva.ExpiraEm
-            });
-        }
-
-        var titulo = $"VanBora — {reserva.ViagemVan.Viagem.NomeEvento}";
-        var preferencia = await _pagamentoGateway.CriarPreferenciaAsync(
-            reserva.Id,
-            titulo,
-            reserva.ValorAPagar(),
-            reserva.ExpiraEm,
-            ct);
-
-        if (preferencia.IsFailure)
-            return preferencia.Error;
-
-        reserva.DefinirLinkPagamento(
-            preferencia.Value.InitPoint,
-            preferencia.Value.PreferenceId);
-
-        _reservaRepo.Update(reserva);
-        await _unitOfWork.SaveChangesAsync(ct);
-
-        return Result<PagarReservaResponse>.Success(new PagarReservaResponse
-        {
-            Id = reserva.Id,
-            Status = reserva.Status.ToString(),
-            InitPoint = preferencia.Value.InitPoint,
-            SandboxInitPoint = preferencia.Value.SandboxInitPoint,
-            PreferenceId = preferencia.Value.PreferenceId,
-            ValorAPagar = reserva.ValorAPagar(),
-            ExpiraEm = reserva.ExpiraEm
+            Telefone = viagem.GerenteUsuario.Telefone?.ToString(),
+            PossuiIngresso = viagem.PossuiIngresso
         });
     }
-
-    public async Task<Result<ReservaResponse>> ObterPorIdAsync(
-        Guid usuarioId,
-        Guid reservaId,
-        CancellationToken ct = default)
-    {
-        var reserva = await _reservaRepo.GetByIdAsync(reservaId, ct);
-        if (reserva is null)
-            return Error.NotFound("RESERVA_NAO_ENCONTRADA", "Reserva não encontrada.");
-
-        if (reserva.UsuarioId != usuarioId)
-            return Error.Forbidden("RESERVA_NAO_AUTORIZADA", "Esta reserva não pertence ao usuário.");
-
-        return MapearResposta(reserva);
-    }
-
-    public async Task<Result<List<ReservaResponse>>> ListarMinhasAsync(
-        Guid usuarioId,
-        CancellationToken ct = default)
-    {
-        var reservas = await _reservaRepo.GetByUsuarioIdAsync(usuarioId, ct);
-        return reservas.Select(MapearResposta).ToList();
-    }
-
-    public async Task<Result<ReservaResponse>> CancelarAsync(
-        Guid usuarioId,
-        Guid reservaId,
-        CancellationToken ct = default)
-    {
-        var reserva = await _reservaRepo.GetByIdAsync(reservaId, ct);
-        if (reserva is null)
-            return Error.NotFound("RESERVA_NAO_ENCONTRADA", "Reserva não encontrada.");
-
-        if (reserva.UsuarioId != usuarioId)
-            return Error.Forbidden("RESERVA_NAO_AUTORIZADA", "Esta reserva não pertence ao usuário.");
-
-        if (reserva.Status == StatusReserva.Concluida)
-            return Error.Validation("RESERVA_CONCLUIDA", "Reserva já finalizada não pode ser cancelada.");
-
-        reserva.Cancelar();
-        _reservaRepo.Update(reserva);
-        await _unitOfWork.SaveChangesAsync(ct);
-
-        return MapearResposta(reserva);
-    }
-
-    public async Task<Result> ProcessarWebhookPagamentoAsync(string paymentId, CancellationToken ct = default)
-    {
-        var pagamento = await _pagamentoGateway.ObterPagamentoAsync(paymentId, ct);
-        if (pagamento.IsFailure)
-            return pagamento.Error;
-
-        var info = pagamento.Value;
-        if (info.Status is not ("approved" or "paid"))
-            return Result.Success();
-
-        if (string.IsNullOrWhiteSpace(info.ExternalReference) ||
-            !Guid.TryParse(info.ExternalReference, out var reservaId))
-            return Error.Validation("REFERENCIA_INVALIDA", "external_reference inválido no pagamento.");
-
-        var reserva = await _reservaRepo.GetByIdAsync(reservaId, ct);
-        if (reserva is null)
-            return Error.NotFound("RESERVA_NAO_ENCONTRADA", "Reserva não encontrada para o pagamento.");
-
-        if (reserva.Status == StatusReserva.Confirmada)
-            return Result.Success();
-
-        if (reserva.Status != StatusReserva.PendentePagamento)
-            return Error.Validation("RESERVA_INVALIDA", "Reserva não está pendente de pagamento.");
-
-        reserva.ConfirmarPagamento(info.PaymentId);
-        _reservaRepo.Update(reserva);
-        await _unitOfWork.SaveChangesAsync(ct);
-
-        return Result.Success();
-    }
-
-    public async Task ExpirarReservasPendentesAsync(CancellationToken ct = default)
-    {
-        var expiraveis = await _reservaRepo.GetExpiraveisAsync(ct);
-        if (expiraveis.Count == 0)
-            return;
-
-        foreach (var reserva in expiraveis)
-            reserva.ExpiracaoAutomatica();
-
-        await _unitOfWork.SaveChangesAsync(ct);
-    }
-
-    private static ReservaResponse MapearResposta(Reserva reserva) =>
-        new()
-        {
-            Id = reserva.Id,
-            ViagemVanId = reserva.ViagemVanId,
-            Status = reserva.Status.ToString(),
-            ValorTotal = reserva.ValorTotal,
-            TaxaPlataforma = reserva.TaxaPlataforma,
-            ValorAPagar = reserva.ValorAPagar(),
-            CodigoPix = reserva.CodigoPix,
-            ExpiraEm = reserva.ExpiraEm,
-            CriadoEm = reserva.CriadoEm,
-            PagoEm = reserva.PagoEm,
-            Itens = reserva.Itens.Select(i => new ItemReservaResponse
-            {
-                Id = i.Id,
-                NumeroAssento = i.NumeroAssento,
-                PrecoAssento = i.PrecoAssento.Valor,
-                NomePassageiro = i.NomePassageiro
-            }).ToList()
-        };
 }

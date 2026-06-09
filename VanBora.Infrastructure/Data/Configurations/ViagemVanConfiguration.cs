@@ -11,23 +11,44 @@ public class ViagemVanConfiguration : IEntityTypeConfiguration<ViagemVan>
         builder.ToTable("viagem_vans");
 
         builder.HasKey(vv => vv.Id);
-        builder.Property(vv => vv.Id).ValueGeneratedNever().HasColumnName("id");
-        builder.Property(vv => vv.ViagemId).HasColumnName("viagem_id");
-        builder.Property(vv => vv.VanId).HasColumnName("van_id");
-        builder.Property(vv => vv.MotoristaUsuarioId).HasColumnName("motorista_usuario_id");
 
+        builder.Property(vv => vv.Id)
+            .ValueGeneratedNever()
+            .HasColumnName("id");
+
+        builder.Property(vv => vv.ViagemId)
+            .IsRequired()
+            .HasColumnName("viagem_id");
+
+        builder.Property(vv => vv.VanId)
+            .IsRequired()
+            .HasColumnName("van_id");
+
+        builder.Property(vv => vv.MotoristaUsuarioId)
+            .HasColumnName("motorista_usuario_id");
+
+        // Relacionamento: ViagemVan → Viagem
+        builder.HasOne(vv => vv.Viagem)
+            .WithMany(v => v.ViagemVans)
+            .HasForeignKey(vv => vv.ViagemId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Relacionamento: ViagemVan → Van
         builder.HasOne(vv => vv.Van)
             .WithMany(v => v.ViagemVans)
             .HasForeignKey(vv => vv.VanId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Relacionamento: ViagemVan → Usuario (Motorista)
+        // Sem navigation property reversa em Usuario
         builder.HasOne(vv => vv.MotoristaUsuario)
             .WithMany()
             .HasForeignKey(vv => vv.MotoristaUsuarioId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        builder.Navigation(vv => vv.Reservas)
-            .UsePropertyAccessMode(PropertyAccessMode.Field)
-            .HasField("_reservas");
+        // Index único: uma van não pode estar duplicada na mesma viagem
+        builder.HasIndex(vv => new { vv.ViagemId, vv.VanId })
+            .IsUnique()
+            .HasDatabaseName("ix_viagem_vans_viagem_id_van_id");
     }
 }

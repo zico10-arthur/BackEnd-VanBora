@@ -15,6 +15,8 @@ public class ViagemRepository : IViagemRepository
         _context = context;
     }
 
+    public IUnitOfWork UnitOfWork => _context;
+
     public async Task<Viagem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.Viagens
@@ -23,22 +25,26 @@ public class ViagemRepository : IViagemRepository
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
     }
 
-    public async Task<List<Viagem>> GetByGerenteUsuarioIdAsync(
-        Guid gerenteUsuarioId,
-        CancellationToken cancellationToken = default)
+    public async Task<List<Viagem>> GetByGerenteUsuarioIdAsync(Guid gerenteUsuarioId, CancellationToken cancellationToken = default)
     {
         return await _context.Viagens
+            .AsNoTracking()
+            .AsSplitQuery()
             .Where(v => v.GerenteUsuarioId == gerenteUsuarioId)
+            .Include(v => v.ViagemVans)
+            .ThenInclude(vv => vv.Van)
+            .OrderBy(v => v.DataEvento)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<List<Viagem>> GetDisponiveisAsync(CancellationToken cancellationToken = default)
     {
-        var agora = DateTime.UtcNow;
         return await _context.Viagens
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Where(v => v.Status == StatusViagem.Agendada)
             .Include(v => v.ViagemVans)
             .ThenInclude(vv => vv.Van)
-            .Where(v => v.Status == StatusViagem.Agendada && v.DataEvento >= agora)
             .OrderBy(v => v.DataEvento)
             .ToListAsync(cancellationToken);
     }
@@ -50,6 +56,8 @@ public class ViagemRepository : IViagemRepository
 
     public void Update(Viagem viagem)
     {
-        _context.Viagens.Update(viagem);
+        var entry = _context.Entry(viagem);
+        if (entry.State == EntityState.Detached)
+            _context.Viagens.Update(viagem);
     }
 }

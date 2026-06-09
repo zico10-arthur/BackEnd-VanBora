@@ -28,6 +28,10 @@ public class Usuario
     public CNH? CNH { get; private set; }
     public Guid? CriadoPorUsuarioId { get; private set; }
 
+    // Exclusão de conta (US20)
+    public string? CodigoExclusao { get; private set; }
+    public DateTime? CodigoExclusaoExpiraEm { get; private set; }
+
     // Navigation — APENAS auto-relacionamento Motorista → Gerente
     public Usuario? CriadoPorUsuario { get; private set; }
 
@@ -194,6 +198,58 @@ public class Usuario
         TaxaPlataforma = taxaPlataforma;
         Gratuito = gratuito;
         ChavePix = chavePix;
+        DataAtualizacao = DateTime.UtcNow;
+    }
+
+    public void AtualizarSlug(string slug)
+    {
+        Guard.AgainstInvalidState(Tipo == TipoUsuario.Gerente, "Apenas Gerentes podem alterar o slug.");
+        Guard.AgainstNullOrWhiteSpace(slug, nameof(slug));
+
+        Slug = slug.Trim().ToLowerInvariant();
+        DataAtualizacao = DateTime.UtcNow;
+    }
+
+    public void AtualizarParametrosGerente(decimal? taxaPlataforma, bool? gratuito)
+    {
+        Guard.AgainstInvalidState(Tipo == TipoUsuario.Gerente, "Apenas Gerentes possuem taxa.");
+        if (taxaPlataforma.HasValue)
+        {
+            Guard.AgainstNegative(taxaPlataforma.Value, nameof(taxaPlataforma));
+            TaxaPlataforma = taxaPlataforma.Value;
+        }
+        if (gratuito.HasValue)
+            Gratuito = gratuito.Value;
+        DataAtualizacao = DateTime.UtcNow;
+    }
+
+    public void DefinirCodigoExclusao(string codigo, DateTime expiraEm)
+    {
+        Guard.AgainstNullOrWhiteSpace(codigo, nameof(codigo));
+        CodigoExclusao = codigo;
+        CodigoExclusaoExpiraEm = expiraEm;
+    }
+
+    public void LimparCodigoExclusao()
+    {
+        CodigoExclusao = null;
+        CodigoExclusaoExpiraEm = null;
+    }
+
+    public void AtualizarChavePix(string? chavePix)
+    {
+        Guard.AgainstInvalidState(Tipo == TipoUsuario.Gerente, "Apenas Gerentes podem alterar a chave PIX.");
+
+        ChavePix = chavePix;
+        DataAtualizacao = DateTime.UtcNow;
+    }
+
+    public void RegistrarCNH(CNH cnh)
+    {
+        Guard.AgainstInvalidState(Tipo == TipoUsuario.Motorista, "Apenas Motoristas podem registrar CNH.");
+        Guard.AgainstNull(cnh, nameof(cnh));
+
+        CNH = cnh;
         DataAtualizacao = DateTime.UtcNow;
     }
 }

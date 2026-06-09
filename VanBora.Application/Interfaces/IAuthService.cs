@@ -16,4 +16,28 @@ public interface IAuthService
     Task<Result<RegistrarPassageiroResponse>> RegistrarPassageiroAsync(
         RegistrarPassageiroRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<Result<AtualizarUsuarioResponse>> AtualizarUsuarioAsync(
+        Guid usuarioId,
+        AtualizarUsuarioRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<string>> AlterarSenhaAsync(
+        Guid usuarioId,
+        AlterarSenhaRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<AtualizarUsuarioResponse>> AtualizarSlugAsync(
+        Guid usuarioId,
+        AtualizarSlugRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<SolicitarExclusaoResponse>> SolicitarExclusaoAsync(
+        Guid usuarioId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<ConfirmarExclusaoResponse>> ConfirmarExclusaoAsync(
+        Guid usuarioId,
+        ConfirmarExclusaoRequest request,
+        CancellationToken cancellationToken = default);
 }

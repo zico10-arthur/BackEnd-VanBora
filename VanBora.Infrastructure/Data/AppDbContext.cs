@@ -1,4 +1,3 @@
-using System.Data;
 using Microsoft.EntityFrameworkCore;
 using VanBora.Domain.Entities;
 using VanBora.Domain.Interfaces;
@@ -13,7 +12,7 @@ public class AppDbContext : DbContext, IUnitOfWork
     public DbSet<Viagem> Viagens => Set<Viagem>();
     public DbSet<ViagemVan> ViagemVans => Set<ViagemVan>();
     public DbSet<Reserva> Reservas => Set<Reserva>();
-    public DbSet<ItemReserva> ItemReservas => Set<ItemReserva>();
+    public DbSet<ItemReserva> ItensReserva => Set<ItemReserva>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
@@ -33,12 +32,9 @@ public class AppDbContext : DbContext, IUnitOfWork
         return await base.SaveChangesAsync(cancellationToken);
     }
 
-    public Task BeginTransactionAsync(CancellationToken cancellationToken = default) =>
-        BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-
-    public async Task BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken = default)
+    public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
-        await Database.BeginTransactionAsync(isolationLevel, cancellationToken);
+        await Database.BeginTransactionAsync(cancellationToken);
     }
 
     public async Task CommitAsync(CancellationToken cancellationToken = default)

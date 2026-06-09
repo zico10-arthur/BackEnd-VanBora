@@ -1,16 +1,18 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VanBora.Application.DTOs.Reservas;
 using VanBora.Application.Interfaces;
-using VanBora.Domain.Common;
 
 namespace Api.Controllers;
 
+/// <summary>
+///     Endpoints de reservas.
+///     Qualquer usuário autenticado pode criar e visualizar suas próprias reservas.
+/// </summary>
 [ApiController]
-[Route("api/[controller]")]
 [Authorize]
+[Route("api/[controller]")]
 public class ReservasController : ControllerBase
 {
     private readonly IReservaService _reservaService;
@@ -20,88 +22,88 @@ public class ReservasController : ControllerBase
         _reservaService = reservaService;
     }
 
+    /// <summary>
+    ///     Cria uma nova reserva de assentos em uma van alocada em uma viagem.
+    /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(ReservaResponse), StatusCodes.Status201Created)]
-    public async Task<IActionResult> Criar(
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CriarReserva(
         [FromBody] CriarReservaRequest request,
         CancellationToken cancellationToken)
     {
         var usuarioId = ObterUsuarioId();
-        if (usuarioId is null)
-            return Unauthorized();
+        var result = await _reservaService.CriarReservaAsync(usuarioId, request, cancellationToken);
 
-        var result = await _reservaService.CriarAsync(usuarioId.Value, request, cancellationToken);
+        // ResultFilter intercepta ObjectResult cujo Value implemente IAppResult
         if (result.IsFailure)
             return new ObjectResult(result);
 
-        return CreatedAtAction(nameof(ObterPorId), new { id = result.Value.Id }, result.Value);
+        return Created(string.Empty, result.Value);
     }
 
+    /// <summary>
+    ///     Lista todas as reservas do usuário autenticado.
+    /// </summary>
     [HttpGet("minhas")]
     [ProducesResponseType(typeof(List<ReservaResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> Minhas(CancellationToken cancellationToken)
+    public async Task<IActionResult> ListarMinhasReservas(CancellationToken cancellationToken)
     {
         var usuarioId = ObterUsuarioId();
-        if (usuarioId is null)
-            return Unauthorized();
+        var result = await _reservaService.ListarMinhasReservasAsync(usuarioId, cancellationToken);
 
-        var result = await _reservaService.ListarMinhasAsync(usuarioId.Value, cancellationToken);
         if (result.IsFailure)
             return new ObjectResult(result);
 
         return Ok(result.Value);
     }
 
-    [HttpGet("{id:guid}")]
+    /// <summary>
+    ///     Obtém os detalhes de uma reserva específica (apenas se for do usuário).
+    /// </summary>
+    [HttpGet("{reservaId:guid}")]
     [ProducesResponseType(typeof(ReservaResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> ObterPorId(Guid id, CancellationToken cancellationToken)
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ObterReservaPorId(
+        Guid reservaId,
+        CancellationToken cancellationToken)
     {
         var usuarioId = ObterUsuarioId();
-        if (usuarioId is null)
-            return Unauthorized();
+        var result = await _reservaService.ObterReservaPorIdAsync(usuarioId, reservaId, cancellationToken);
 
-        var result = await _reservaService.ObterPorIdAsync(usuarioId.Value, id, cancellationToken);
         if (result.IsFailure)
             return new ObjectResult(result);
 
         return Ok(result.Value);
     }
 
-    [HttpPost("{id:guid}/pagar")]
-    [ProducesResponseType(typeof(PagarReservaResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> Pagar(Guid id, CancellationToken cancellationToken)
+    /// <summary>
+    ///     Obtém o contato do gerente para reservas de viagens que possuem ingresso (PossuiIngresso = true).
+    ///     Retorna o telefone do gerente para que o passageiro possa combinar a compra do ingresso diretamente.
+    /// </summary>
+    [HttpGet("{reservaId:guid}/contato-gerente")]
+    [ProducesResponseType(typeof(ContatoGerenteResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ObterContatoGerente(
+        Guid reservaId,
+        CancellationToken cancellationToken)
     {
         var usuarioId = ObterUsuarioId();
-        if (usuarioId is null)
-            return Unauthorized();
+        var result = await _reservaService.ObterContatoGerenteAsync(usuarioId, reservaId, cancellationToken);
 
-        var result = await _reservaService.GerarPagamentoAsync(usuarioId.Value, id, cancellationToken);
         if (result.IsFailure)
             return new ObjectResult(result);
 
         return Ok(result.Value);
     }
 
-    [HttpPost("{id:guid}/cancelar")]
-    [ProducesResponseType(typeof(ReservaResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> Cancelar(Guid id, CancellationToken cancellationToken)
+    private Guid ObterUsuarioId()
     {
-        var usuarioId = ObterUsuarioId();
-        if (usuarioId is null)
-            return Unauthorized();
-
-        var result = await _reservaService.CancelarAsync(usuarioId.Value, id, cancellationToken);
-        if (result.IsFailure)
-            return new ObjectResult(result);
-
-        return Ok(result.Value);
-    }
-
-    private Guid? ObterUsuarioId()
-    {
-        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
-            ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(sub, out var id) ? id : null;
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(claim, out var id) ? id : Guid.Empty;
     }
 }
