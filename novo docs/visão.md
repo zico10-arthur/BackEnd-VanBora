@@ -104,9 +104,11 @@ O `visão.md` é a bússola do projeto. Nenhuma spec vive isolada — cada uma e
 
 ## 8. Specs do Projeto
 
-| Spec | Descrição | Valor para o usuário final |
-|---|---|---|
-| *(exemplo)* Spec 001 — Autenticação JWT | Registro e login com perfis Admin, Vendedor e Comprador | Cada usuário acessa apenas o que é relevante para seu perfil, com segurança |
-| — | — | — |
-
-*Esta tabela será preenchida conforme as specs forem criadas.*
+| Spec | Descrição | Problema que resolve para o usuário final | Status |
+|---|---|---|---|
+| Spec 10 — Dashboard do Gerente | Portal inicial pós-login com cards de indicadores e próximas viagens | O gerente não tem nenhuma tela após o login — fica perdido sem saber quantas viagens ativas, reservas ou receita tem | 🔴 pendente |
+| Spec 20 — Gerenciamento de Viagens | Criar, listar, editar e cancelar viagens (evento + origem/destino + preço) | Sem isso o gerente não publica anúncios — é o core do marketplace. Substitui o mock atual de jogos do Botafogo por tela real integrada | 🔴 pendente |
+| Spec 30 — Gerenciamento de Vans | Listar, cadastrar, editar e remover vans da frota (placa, modelo, ano, capacidade) | O gerente precisa cadastrar seus veículos antes de poder alocá-los a viagens | 🔴 pendente |
+| Spec 40 — Gerenciamento de Motoristas | Listar, cadastrar, editar e remover motoristas (CPF, CNH, idade, validade) | O gerente precisa registrar quem vai dirigir — com validação de CNH válida e idade mínima de 18 anos | 🔴 pendente |
+| Spec 50 — Alocação de Recursos à Viagem | Alocar/remover van e motorista a uma viagem específica | Uma viagem só aparece para compradores quando tem van + motorista alocados. Esta spec fecha o ciclo de publicação | 🔴 pendente |
+| Spec 60 — Relatório Financeiro da Viagem | Indicadores de receita, ocupação, break-even e lista de embarque por viagem | O gerente precisa saber se a viagem deu lucro, quantos assentos vendeu e quem são os passageiros | 🔴 pendente |
