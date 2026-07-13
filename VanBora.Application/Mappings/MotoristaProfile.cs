@@ -10,6 +10,7 @@ public sealed class MotoristaProfile : Profile
     {
         CreateMap<Usuario, RegistrarMotoristaResponse>()
             .ForMember(dest => dest.Cpf, opt => opt.MapFrom(src => src.CPF.Valor))
+            .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email != null ? src.Email.Valor : null))
             .ForMember(dest => dest.Cnh, opt => opt.MapFrom(src => src.CNH != null ? src.CNH.Valor : string.Empty))
             .ForMember(dest => dest.Telefone, opt => opt.MapFrom(src =>
                 src.Telefone != null ? src.Telefone.ValorCompleto : null))

@@ -33,6 +33,9 @@ export function Header() {
                   <Link href="/gerente/vans" className={navLink}>
                     Minhas Vans
                   </Link>
+                  <Link href="/gerente/motoristas" className={navLink}>
+                    Motoristas
+                  </Link>
                   <Link href="/motorista/nova-viagem" className={`${navLink} text-van-amber/90`}>
                     Painel
                   </Link>

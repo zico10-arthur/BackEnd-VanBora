@@ -79,9 +79,17 @@ export function MobileNav({ onNavigate }: Props) {
                     Minhas reservas
                   </Link>
                   {isGerenteOuMotorista(user.perfis) ? (
-                    <Link href="/motorista/nova-viagem" className={linkClass} onClick={close}>
-                      Painel do frotista
-                    </Link>
+                    <>
+                      <Link href="/gerente/vans" className={linkClass} onClick={close}>
+                        Minhas Vans
+                      </Link>
+                      <Link href="/gerente/motoristas" className={linkClass} onClick={close}>
+                        Motoristas
+                      </Link>
+                      <Link href="/motorista/nova-viagem" className={linkClass} onClick={close}>
+                        Painel do frotista
+                      </Link>
+                    </>
                   ) : null}
                   <button
                     type="button"

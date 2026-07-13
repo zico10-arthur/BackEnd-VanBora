@@ -86,7 +86,17 @@ public class MotoristaService : IMotoristaService
             // Se o CPF já existe e é um Motorista do mesmo gerente → idempotente
             if (usuarioExistente.Tipo == TipoUsuario.Motorista
                 && usuarioExistente.CriadoPorUsuarioId == gerenteId)
-                return  _mapper.Map<RegistrarMotoristaResponse>(usuarioExistente);
+            {
+                // Se o motorista estava inativo, reativa
+                if (!usuarioExistente.Ativo)
+                {
+                    usuarioExistente.Ativar();
+                    usuarioExistente.RegistrarCNH(cnh);
+                    _repository.Update(usuarioExistente);
+                    await _unitOfWork.SaveChangesAsync(ct);
+                }
+                return _mapper.Map<RegistrarMotoristaResponse>(usuarioExistente);
+            }
 
             // CPF já cadastrado como outro tipo de usuário
             return Result<RegistrarMotoristaResponse>.Failure(
@@ -130,6 +140,39 @@ public class MotoristaService : IMotoristaService
         var motoristas = await _repository.GetMotoristasByGerenteIdAsync(gerenteId, ct);
         var response = _mapper.Map<List<RegistrarMotoristaResponse>>(motoristas);
         return Result<List<RegistrarMotoristaResponse>>.Success(response);
+    }
+
+    public async Task<Result<RegistrarMotoristaResponse>> ObterMotoristaPorId(
+        Guid gerenteId,
+        Guid motoristaId,
+        CancellationToken ct = default)
+    {
+        var gerente = await _repository.GetByIdAsync(gerenteId, ct);
+
+        if (gerente is null)
+            return Result<RegistrarMotoristaResponse>.Failure(
+                Error.NotFound("USUARIO_NAO_ENCONTRADO", "Gerente não encontrado."));
+
+        if (gerente.Tipo != TipoUsuario.Gerente)
+            return Result<RegistrarMotoristaResponse>.Failure(
+                Error.Unauthorized("USUARIO_NAO_AUTORIZADO", "O usuário não é um gerente."));
+
+        var motorista = await _repository.GetByIdAsync(motoristaId, ct);
+
+        if (motorista is null)
+            return Result<RegistrarMotoristaResponse>.Failure(
+                Error.NotFound("MOTORISTA_NAO_ENCONTRADO", "Motorista não encontrado."));
+
+        if (motorista.Tipo != TipoUsuario.Motorista)
+            return Result<RegistrarMotoristaResponse>.Failure(
+                Error.Validation("USUARIO_NAO_E_MOTORISTA", "O usuário informado não é um motorista."));
+
+        if (motorista.CriadoPorUsuarioId != gerenteId)
+            return Result<RegistrarMotoristaResponse>.Failure(
+                Error.Forbidden("ACESSO_NEGADO", "Motorista não pertence a este gerente."));
+
+        var response = _mapper.Map<RegistrarMotoristaResponse>(motorista);
+        return Result<RegistrarMotoristaResponse>.Success(response);
     }
 
     public async Task<Result<RegistrarMotoristaResponse>> AtualizarMotorista(
@@ -186,6 +229,12 @@ public class MotoristaService : IMotoristaService
             telefone = telefoneResult.Value;
         }
 
+        // Valida se a CNH já está em uso por outro motorista do mesmo gerente
+        var motoristasDoGerente = await _repository.GetMotoristasByGerenteIdAsync(gerenteId, ct);
+        if (motoristasDoGerente.Any(m => m.Id != motoristaId && m.CNH is not null && m.CNH.Valor == cnhResult.Value.Valor))
+            return Result<RegistrarMotoristaResponse>.Failure(
+                Error.Conflict("CNH_JA_CADASTRADA", "CNH já cadastrada por este gerente."));
+
         motorista.AtualizarDados(request.Nome, motorista.Email, telefone);
         motorista.RegistrarCNH(cnhResult.Value);
 
@@ -240,5 +289,46 @@ public class MotoristaService : IMotoristaService
         await _unitOfWork.SaveChangesAsync(ct);
 
         return Result<bool>.Success(true);
+    }
+
+    public async Task<Result<RegistrarMotoristaResponse>> AlternarStatusMotorista(
+        Guid gerenteId,
+        Guid motoristaId,
+        CancellationToken ct = default)
+    {
+        var gerente = await _repository.GetByIdAsync(gerenteId, ct);
+
+        if (gerente is null)
+            return Result<RegistrarMotoristaResponse>.Failure(
+                Error.NotFound("USUARIO_NAO_ENCONTRADO", "Gerente não encontrado."));
+
+        if (gerente.Tipo != TipoUsuario.Gerente)
+            return Result<RegistrarMotoristaResponse>.Failure(
+                Error.Unauthorized("USUARIO_NAO_AUTORIZADO", "O usuário não é um gerente."));
+
+        var motorista = await _repository.GetByIdAsync(motoristaId, ct);
+
+        if (motorista is null)
+            return Result<RegistrarMotoristaResponse>.Failure(
+                Error.NotFound("MOTORISTA_NAO_ENCONTRADO", "Motorista não encontrado."));
+
+        if (motorista.Tipo != TipoUsuario.Motorista)
+            return Result<RegistrarMotoristaResponse>.Failure(
+                Error.Validation("USUARIO_NAO_E_MOTORISTA", "O usuário informado não é um motorista."));
+
+        if (motorista.CriadoPorUsuarioId != gerenteId)
+            return Result<RegistrarMotoristaResponse>.Failure(
+                Error.Forbidden("ACESSO_NEGADO", "Motorista não pertence a este gerente."));
+
+        if (motorista.Ativo)
+            motorista.Desativar();
+        else
+            motorista.Ativar();
+
+        _repository.Update(motorista);
+        await _unitOfWork.SaveChangesAsync(ct);
+
+        var response = _mapper.Map<RegistrarMotoristaResponse>(motorista);
+        return Result<RegistrarMotoristaResponse>.Success(response);
     }
 }

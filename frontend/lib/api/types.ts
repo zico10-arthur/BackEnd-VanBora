@@ -105,3 +105,26 @@ export type AtualizarVanRequest = {
   nome: string;
   placa: string;
 };
+
+// ── Spec 40 — Motoristas ────────────────────────────────────────────
+
+export type MotoristaResponse = {
+  id: string;
+  tipo: string;
+  nome: string;
+  cpf: string;
+  email: string | null;
+  telefone: string | null;
+  ativo: boolean;
+  criadoEm: string;
+  dataAtualizacao: string | null;
+  cnh: string;
+  criadoPorUsuarioId: string;
+};
+
+export type CriarMotoristaRequest = {
+  nome: string;
+  cpf: string;
+  telefone: string | null;
+  cnh: string;
+};
