@@ -1,6 +1,6 @@
 ---
 name: Gerenciamento de Vans
-status: pendente
+status: auditada
 references:
   - visão.md: Item 3 — Vans
   - roadmap.md: Spec 30

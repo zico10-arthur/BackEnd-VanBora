@@ -60,7 +60,7 @@ export function HomeBlackLabel() {
               Ver viagens disponíveis
             </Link>
             <Link
-              href="/cadastro/passageiro"
+              href="/cadastro"
               className="inline-flex min-h-[48px] items-center justify-center rounded-xl border border-zinc-600 bg-zinc-950/40 px-8 py-3.5 text-sm font-semibold text-zinc-100 transition hover:border-zinc-400 hover:bg-white/5"
             >
               Criar conta gratuita

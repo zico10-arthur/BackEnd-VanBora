@@ -41,15 +41,13 @@ public class Van
         CriadoEm = DateTime.UtcNow;
     }
 
-    public void AtualizarDados(string nome, Placa placa, string modelo)
+    public void AtualizarDados(string nome, Placa placa)
     {
         Guard.AgainstNullOrWhiteSpace(nome, nameof(nome));
         Guard.AgainstNull(placa, nameof(placa));
-        Guard.AgainstNullOrWhiteSpace(modelo, nameof(modelo));
 
         Nome = nome;
         Placa = placa;
-        Modelo = modelo;
     }
 
     public void Ativar()

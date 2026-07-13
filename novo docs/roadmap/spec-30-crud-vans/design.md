@@ -1,6 +1,6 @@
 ---
 name: Gerenciamento de Vans
-status: pendente
+status: auditada
 ---
 
 # Design — Spec 30: Gerenciamento de Vans

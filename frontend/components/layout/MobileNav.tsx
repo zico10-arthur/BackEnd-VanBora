@@ -100,7 +100,7 @@ export function MobileNav({ onNavigate }: Props) {
                     Entrar
                   </Link>
                   <Link
-                    href="/cadastro/passageiro"
+                    href="/cadastro"
                     className="mt-2 block rounded-xl bg-van-amber px-4 py-3.5 text-center text-base font-bold text-van-void"
                     onClick={close}
                   >

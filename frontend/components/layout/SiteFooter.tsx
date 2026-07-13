@@ -19,7 +19,7 @@ export function SiteFooter() {
           <Link href="/entrar" className="transition hover:text-white">
             Entrar
           </Link>
-          <Link href="/cadastro/passageiro" className="transition hover:text-white">
+          <Link href="/cadastro" className="transition hover:text-white">
             Criar conta
           </Link>
           <Link href="/motorista/login" className="transition hover:text-white">

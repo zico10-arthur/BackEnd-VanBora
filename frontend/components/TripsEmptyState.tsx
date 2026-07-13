@@ -30,7 +30,7 @@ export function TripsEmptyState({ className }: TripsEmptyStateProps) {
         Ainda não há vans disponíveis para os próximos eventos. Volte em breve ou cadastre-se para receber novidades.
       </p>
       <Link
-        href="/cadastro/passageiro"
+        href="/cadastro"
         className="mt-8 inline-flex min-h-[44px] w-full max-w-xs items-center justify-center rounded-xl bg-van-amber/15 px-4 py-3 text-sm font-semibold text-van-amber ring-1 ring-van-amber/25 transition hover:bg-van-amber/25"
       >
         Criar minha conta

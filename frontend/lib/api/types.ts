@@ -81,3 +81,27 @@ export type PagarReservaResponse = {
   valorAPagar: number;
   expiraEm: string;
 };
+
+// ── Spec 30 — Vans ────────────────────────────────────────────────
+
+export type VanResponse = {
+  id: string;
+  nome: string;
+  placa: string;
+  modelo: string;
+  capacidade: number;
+  ativo: boolean;
+  criadoEm: string;
+};
+
+export type CriarVanRequest = {
+  nome: string;
+  placa: string;
+  modelo: string;
+  capacidade: number;
+};
+
+export type AtualizarVanRequest = {
+  nome: string;
+  placa: string;
+};
