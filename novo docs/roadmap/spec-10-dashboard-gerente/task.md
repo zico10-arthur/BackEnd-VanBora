@@ -9,7 +9,8 @@ status: pendente
 
 ### 1. Tipos e API
 - [ ] **T1.1** — Adicionar tipos `ViagemResumo` e `DashboardData` em `lib/api/types.ts`
-- [ ] **T1.2** — Criar função `listarViagensGerente()` em `lib/api/viagens.ts` que chama `GET api/gerente/viagens` com auth
+- [ ] **T1.2** — **Verificar CORS**: o endpoint `GET api/gerente/viagens` já foi validado nas specs anteriores (20 e 50). Apenas confirmar que a chamada com token JWT funciona do dashboard
+- [ ] **T1.3** — Criar função `listarViagensGerente()` em `lib/api/viagens.ts` que chama `GET api/gerente/viagens` com auth
 
 ### 2. Componente StatCard
 - [ ] **T2.1** — Criar `components/gerente/dashboard/StatCard.tsx`

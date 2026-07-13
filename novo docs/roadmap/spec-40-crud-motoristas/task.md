@@ -9,7 +9,8 @@ status: pendente
 
 ### 1. Tipos e API
 - [ ] **T1.1** — Adicionar tipos `MotoristaResponse`, `CriarMotoristaRequest` em `lib/api/types.ts`
-- [ ] **T1.2** — Criar funções em `lib/api/motoristas.ts` (novo arquivo):
+- [ ] **T1.2** — **Verificar CORS**: confirmar que os endpoints `api/auth/motorista*` respondem a chamadas cross-origin do frontend. Se instalado em `Program.cs`, o middleware CORS já cobre novas rotas — testar com uma chamada do navegador
+- [ ] **T1.3** — Criar funções em `lib/api/motoristas.ts` (novo arquivo):
   - `listarMotoristas()` → `GET api/auth/motoristas`
   - `criarMotorista(body)` → `POST api/auth/motorista/registrar`
   - `atualizarMotorista(id, body)` → `PUT api/auth/motorista/{id}`

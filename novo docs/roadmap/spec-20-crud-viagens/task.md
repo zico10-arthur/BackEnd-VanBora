@@ -9,7 +9,8 @@ status: pendente
 
 ### 1. Tipos e API
 - [ ] **T1.1** — Adicionar tipos `CriarViagemRequest`, `ViagemGerenteResponse`, `ViagemVanInfo` em `lib/api/types.ts`
-- [ ] **T1.2** — Criar funções em `lib/api/viagens.ts`:
+- [ ] **T1.2** — **Verificar CORS**: testar chamada `GET api/gerente/viagens` do frontend com token JWT no header. Se retornar erro CORS, ajustar `Program.cs` para incluir a origin do frontend
+- [ ] **T1.3** — Criar funções em `lib/api/viagens.ts`:
   - `criarViagem(body)` → `POST api/gerente/viagens`
   - `listarViagensGerente()` → `GET api/gerente/viagens`
   - `atualizarViagem(id, body)` → `PUT api/gerente/viagens/{id}`

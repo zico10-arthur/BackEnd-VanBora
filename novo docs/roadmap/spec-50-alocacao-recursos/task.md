@@ -8,6 +8,7 @@ status: pendente
 ## Checklist
 
 ### 1. API (funções adicionais)
+- [ ] **T1.0** — **Verificar CORS**: testar chamadas POST/DELETE para `api/gerente/viagens/{id}/alocar-van` e `alocar-motorista` do frontend. Confirmar que o backend aceita os métodos HTTP e headers necessários
 - [ ] **T1.1** — Adicionar funções em arquivos existentes:
   - `alocarVan(viagemId, vanId)` → `POST api/gerente/viagens/{id}/alocar-van` em `lib/api/viagens.ts`
   - `removerVanAlocada(viagemId, viagemVanId)` → `DELETE api/gerente/viagens/{id}/alocar-van/{viagemVanId}`

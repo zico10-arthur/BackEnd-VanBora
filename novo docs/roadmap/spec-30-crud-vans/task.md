@@ -9,7 +9,8 @@ status: pendente
 
 ### 1. Tipos e API
 - [ ] **T1.1** — Adicionar tipos `VanResponse`, `CriarVanRequest` em `lib/api/types.ts`
-- [ ] **T1.2** — Criar funções em `lib/api/vans.ts` (novo arquivo):
+- [ ] **T1.2** — **Configurar CORS no backend**: verificar `Program.cs` e garantir que a origin do frontend (`http://localhost:3000`) está liberada nos endpoints `api/gerente/vans`. Se necessário, adicionar política CORS para permitir métodos GET/POST/PUT/DELETE com header `Authorization`
+- [ ] **T1.3** — Criar funções em `lib/api/vans.ts` (novo arquivo):
   - `listarVans()` → `GET api/gerente/vans`
   - `criarVan(body)` → `POST api/gerente/vans`
   - `atualizarVan(id, body)` → `PUT api/gerente/vans/{id}`

@@ -9,7 +9,8 @@ status: pendente
 
 ### 1. Tipos e API
 - [ ] **T1.1** — Adicionar tipos `RelatorioResponse`, `PassageiroRelatorio` em `lib/api/types.ts`
-- [ ] **T1.2** — Criar função `obterRelatorio(viagemId)` → `GET api/gerente/viagens/{id}/relatorio` em `lib/api/viagens.ts`
+- [ ] **T1.2** — **Verificar CORS**: testar chamada `GET api/gerente/viagens/{id}/relatorio` do frontend. Como a rota está sob o mesmo path de viagens já testado na Spec 20, o CORS deve funcionar — apenas validar
+- [ ] **T1.3** — Criar função `obterRelatorio(viagemId)` → `GET api/gerente/viagens/{id}/relatorio` em `lib/api/viagens.ts`
 
 ### 2. Componente ProgressBar
 - [ ] **T2.1** — Criar `components/ui/ProgressBar.tsx`
