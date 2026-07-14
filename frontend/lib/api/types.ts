@@ -128,3 +128,45 @@ export type CriarMotoristaRequest = {
   telefone: string | null;
   cnh: string;
 };
+
+// ── Spec 20 — Viagens (Gerente) ──────────────────────────────────
+
+export type CriarViagemRequest = {
+  nomeEvento: string;
+  dataEvento: string;
+  localEvento: string;
+  origemDescricao: string;
+  origemCidade: string;
+  origemEstado: string;
+  destinoDescricao: string;
+  destinoCidade: string;
+  destinoEstado: string;
+  dataSaida: string;
+  dataChegada: string;
+  precoAssento: number;
+  possuiIngresso: boolean;
+};
+
+export type AtualizarViagemRequest = CriarViagemRequest;
+
+export type ViagemVanGerenteInfo = {
+  viagemVanId: string;
+  vanModelo: string;
+  vanPlaca: string;
+  capacidade: number;
+  assentosVendidos: number;
+  motoristaNome: string | null;
+};
+
+export type ViagemGerenteResponse = {
+  viagemId: string;
+  nomeEvento: string;
+  dataEvento: string;
+  dataPartida: string;
+  origem: string;
+  destino: string;
+  precoAssento: number;
+  possuiIngresso: boolean;
+  status: string;
+  vans: ViagemVanGerenteInfo[];
+};
