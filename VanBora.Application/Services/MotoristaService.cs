@@ -91,7 +91,10 @@ public class MotoristaService : IMotoristaService
                 if (!usuarioExistente.Ativo)
                 {
                     usuarioExistente.Ativar();
-                    usuarioExistente.RegistrarCNH(cnh);
+                    if (usuarioExistente.CNH is null || usuarioExistente.CNH.Valor != cnh.Valor)
+                    {
+                        usuarioExistente.RegistrarCNH(cnh);
+                    }
                     _repository.Update(usuarioExistente);
                     await _unitOfWork.SaveChangesAsync(ct);
                 }
@@ -229,11 +232,15 @@ public class MotoristaService : IMotoristaService
             telefone = telefoneResult.Value;
         }
 
-        // Valida se a CNH já está em uso por outro motorista do mesmo gerente
-        var motoristasDoGerente = await _repository.GetMotoristasByGerenteIdAsync(gerenteId, ct);
-        if (motoristasDoGerente.Any(m => m.Id != motoristaId && m.CNH is not null && m.CNH.Valor == cnhResult.Value.Valor))
-            return Result<RegistrarMotoristaResponse>.Failure(
-                Error.Conflict("CNH_JA_CADASTRADA", "CNH já cadastrada por este gerente."));
+        // Valida se a CNH já está em uso por outro motorista do mesmo gerente (só se a CNH foi alterada)
+        var cnhAlterada = motorista.CNH is null || motorista.CNH.Valor != cnhResult.Value.Valor;
+        if (cnhAlterada)
+        {
+            var motoristasDoGerente = await _repository.GetMotoristasByGerenteIdAsync(gerenteId, ct);
+            if (motoristasDoGerente.Any(m => m.Id != motoristaId && m.CNH is not null && m.CNH.Valor == cnhResult.Value.Valor))
+                return Result<RegistrarMotoristaResponse>.Failure(
+                    Error.Conflict("CNH_JA_CADASTRADA", "CNH já cadastrada por este gerente."));
+        }
 
         motorista.AtualizarDados(request.Nome, motorista.Email, telefone);
         motorista.RegistrarCNH(cnhResult.Value);

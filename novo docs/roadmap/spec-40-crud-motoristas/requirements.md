@@ -1,6 +1,6 @@
 ---
 name: Gerenciamento de Motoristas
-status: pendente
+status: auditada
 references:
   - visão.md: Item 2 — Motoristas
   - roadmap.md: Spec 40
