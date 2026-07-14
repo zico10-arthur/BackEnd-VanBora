@@ -98,7 +98,8 @@ public class MotoristaService : IMotoristaService
                     _repository.Update(usuarioExistente);
                     await _unitOfWork.SaveChangesAsync(ct);
                 }
-                return _mapper.Map<RegistrarMotoristaResponse>(usuarioExistente);
+                return Result<RegistrarMotoristaResponse>.Failure(
+                    Error.Conflict("CPF_JA_CADASTRADO", "CPF já cadastrado no sistema."));
             }
 
             // CPF já cadastrado como outro tipo de usuário
