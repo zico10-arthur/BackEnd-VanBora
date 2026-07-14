@@ -19,10 +19,12 @@ export function VansListClient({ sucesso }: { sucesso: string | null }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<"success" | "error">("success");
 
   // Show toast from URL success param, then clean URL
   useEffect(() => {
     if (sucesso && SUCCESS_MAP[sucesso]) {
+      setToastType("success");
       setToastMessage(SUCCESS_MAP[sucesso]);
       router.replace("/gerente/vans", { scroll: false });
     }
@@ -47,15 +49,22 @@ export function VansListClient({ sucesso }: { sucesso: string | null }) {
   }, [fetchVans]);
 
   async function handleToggleStatus(id: string) {
-    const updated = await alternarStatusVan(id);
-    setVans((prev) => prev.map((v) => (v.id === id ? updated : v)));
-    setToastMessage(updated.ativo ? "Van ativada com sucesso!" : "Van desativada com sucesso!");
+    try {
+      const updated = await alternarStatusVan(id);
+      setVans((prev) => prev.map((v) => (v.id === id ? updated : v)));
+      setToastType("success");
+      setToastMessage(updated.ativo ? "Van ativada com sucesso!" : "Van desativada com sucesso!");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao alterar status da van.";
+      setToastType("error");
+      setToastMessage(msg);
+    }
   }
 
   // ── Toast banner ─────────────────────────────────────────────────
   const toastEl = useMemo(
-    () => <ToastBanner message={toastMessage} onDismiss={() => setToastMessage(null)} />,
-    [toastMessage],
+    () => <ToastBanner message={toastMessage} type={toastType} onDismiss={() => setToastMessage(null)} />,
+    [toastMessage, toastType],
   );
 
   // ── Loading ──────────────────────────────────────────────────────

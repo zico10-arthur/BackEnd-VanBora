@@ -31,6 +31,8 @@ if (jwtSettings.SecretKey.Length < 32)
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = true; // .NET 9+: garante "sub" → NameIdentifier
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,

@@ -44,8 +44,8 @@ export function VanForm({ van, onSubmit, submitLabel }: VanFormProps) {
       const cap = Number(capacidade);
       if (!capacidade || isNaN(cap)) {
         errs.capacidade = "Informe a capacidade.";
-      } else if (cap < 8 || cap > 25) {
-        errs.capacidade = "Capacidade deve ser entre 8 e 25 lugares.";
+      } else if (cap < 9 || cap > 25) {
+        errs.capacidade = "Capacidade deve ser entre 9 e 25 lugares.";
       }
     }
 
@@ -155,8 +155,8 @@ export function VanForm({ van, onSubmit, submitLabel }: VanFormProps) {
             className={inputClass}
             value={capacidade}
             onChange={(e) => setCapacidade(e.target.value)}
-            placeholder="8 a 25"
-            min={8}
+            placeholder="9 a 25"
+            min={9}
             max={25}
           />
           {errors.capacidade && <p className={errorClass}>{errors.capacidade}</p>}

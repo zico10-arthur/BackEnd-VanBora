@@ -4,6 +4,7 @@ using VanBora.Application.DTOs.Vans;
 using VanBora.Application.Interfaces;
 using VanBora.Domain.Common;
 using VanBora.Domain.Entities;
+using VanBora.Domain.Enums;
 using VanBora.Domain.Interfaces;
 using VanBora.Domain.ValueObjects;
 
@@ -12,17 +13,20 @@ namespace VanBora.Application.Services;
 public class VanService : IVanService
 {
     private readonly IVanRepository _vanRepository;
+    private readonly IViagemVanRepository _viagemVanRepository;
     private readonly IMapper _mapper;
     private readonly IValidator<CriarVanRequest> _criarValidator;
     private readonly IValidator<AtualizarVanRequest> _atualizarValidator;
 
     public VanService(
         IVanRepository vanRepository,
+        IViagemVanRepository viagemVanRepository,
         IMapper mapper,
         IValidator<CriarVanRequest> criarValidator,
         IValidator<AtualizarVanRequest> atualizarValidator)
     {
         _vanRepository = vanRepository;
+        _viagemVanRepository = viagemVanRepository;
         _mapper = mapper;
         _criarValidator = criarValidator;
         _atualizarValidator = atualizarValidator;
@@ -143,6 +147,16 @@ public class VanService : IVanService
         if (van is null)
             return Result<bool>.Failure(Error.NotFound("VAN_NAO_ENCONTRADA", "Van não encontrada."));
 
+        // Valida se a van está alocada em viagens futuras
+        var alocacoes = await _viagemVanRepository.GetByVanIdAsync(vanId, cancellationToken);
+        var temViagemFutura = alocacoes
+            .Any(vv => vv.Viagem.DataPartida > DateTime.UtcNow
+                       && vv.Viagem.Status != StatusViagem.Cancelada);
+
+        if (temViagemFutura)
+            return Result<bool>.Failure(
+                Error.Validation("VAN_COM_VIAGENS_FUTURAS", "Van possui viagens futuras. Remova a alocação primeiro."));
+
         van.Desativar();
 
         _vanRepository.Update(van);
@@ -158,9 +172,23 @@ public class VanService : IVanService
             return Result<VanResponse>.Failure(Error.NotFound("VAN_NAO_ENCONTRADA", "Van não encontrada."));
 
         if (van.Ativo)
+        {
+            // Valida se a van está alocada em viagens futuras antes de desativar
+            var alocacoes = await _viagemVanRepository.GetByVanIdAsync(vanId, cancellationToken);
+            var temViagemFutura = alocacoes
+                .Any(vv => vv.Viagem.DataPartida > DateTime.UtcNow
+                           && vv.Viagem.Status != StatusViagem.Cancelada);
+
+            if (temViagemFutura)
+                return Result<VanResponse>.Failure(
+                    Error.Validation("VAN_COM_VIAGENS_FUTURAS", "Van possui viagens futuras. Remova a alocação primeiro."));
+
             van.Desativar();
+        }
         else
+        {
             van.Ativar();
+        }
 
         _vanRepository.Update(van);
         await _vanRepository.UnitOfWork.SaveChangesAsync(cancellationToken);

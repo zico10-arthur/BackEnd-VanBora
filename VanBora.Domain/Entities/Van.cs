@@ -29,7 +29,7 @@ public class Van
         Guard.AgainstNullOrWhiteSpace(nome, nameof(nome));
         Guard.AgainstNull(placa, nameof(placa));
         Guard.AgainstNullOrWhiteSpace(modelo, nameof(modelo));
-        Guard.AgainstLessThan(capacidade, 2, nameof(capacidade)); // mínimo: 1 motorista + 1 passageiro
+        Guard.AgainstLessThan(capacidade, 9, nameof(capacidade)); // mínimo: 1 motorista + 8 passageiros
 
         Id = Guid.NewGuid();
         GerenteUsuarioId = gerenteUsuarioId;
