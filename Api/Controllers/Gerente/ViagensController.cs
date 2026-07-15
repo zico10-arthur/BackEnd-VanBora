@@ -29,7 +29,7 @@ public class ViagensController : ControllerBase
     ///     Cadastra uma nova viagem.
     /// </summary>
     [HttpPost]
-    [ProducesResponseType(typeof(ViagemResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ViagemGerenteResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Criar(
         [FromBody] CriarViagemRequest request,
@@ -41,14 +41,18 @@ public class ViagensController : ControllerBase
         if (result.IsFailure)
             return new ObjectResult(result);
 
-        return Created(string.Empty, result.Value);
+        var detalhe = await _viagemService.ObterPorGerenteAsync(gerenteId, result.Value.Id, cancellationToken);
+        if (detalhe.IsFailure)
+            return new ObjectResult(detalhe);
+
+        return Created(string.Empty, detalhe.Value);
     }
 
     /// <summary>
     ///     Lista todas as viagens do gerente autenticado.
     /// </summary>
     [HttpGet]
-    [ProducesResponseType(typeof(List<ViagemResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<ViagemGerenteResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ListarPorGerente(CancellationToken cancellationToken)
     {
         var gerenteId = ObterGerenteId();
@@ -61,10 +65,28 @@ public class ViagensController : ControllerBase
     }
 
     /// <summary>
+    ///     Obtém uma viagem do gerente autenticado.
+    /// </summary>
+    [HttpGet("{viagemId:guid}")]
+    [ProducesResponseType(typeof(ViagemGerenteResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ObterPorId(Guid viagemId, CancellationToken cancellationToken)
+    {
+        var gerenteId = ObterGerenteId();
+        var result = await _viagemService.ObterPorGerenteAsync(gerenteId, viagemId, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     ///     Atualiza os dados de uma viagem.
     /// </summary>
     [HttpPut("{viagemId:guid}")]
-    [ProducesResponseType(typeof(ViagemResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ViagemGerenteResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Atualizar(
@@ -78,7 +100,11 @@ public class ViagensController : ControllerBase
         if (result.IsFailure)
             return new ObjectResult(result);
 
-        return Ok(result.Value);
+        var detalhe = await _viagemService.ObterPorGerenteAsync(gerenteId, viagemId, cancellationToken);
+        if (detalhe.IsFailure)
+            return new ObjectResult(detalhe);
+
+        return Ok(detalhe.Value);
     }
 
     /// <summary>
@@ -103,7 +129,7 @@ public class ViagensController : ControllerBase
     ///     Aloca uma van a uma viagem.
     /// </summary>
     [HttpPost("{viagemId:guid}/alocar-van")]
-    [ProducesResponseType(typeof(ViagemResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ViagemGerenteResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AlocarVan(
@@ -117,14 +143,18 @@ public class ViagensController : ControllerBase
         if (result.IsFailure)
             return new ObjectResult(result);
 
-        return Ok(result.Value);
+        var detalhe = await _viagemService.ObterPorGerenteAsync(gerenteId, viagemId, cancellationToken);
+        if (detalhe.IsFailure)
+            return new ObjectResult(detalhe);
+
+        return Ok(detalhe.Value);
     }
 
     /// <summary>
     ///     Remove a alocação de uma van de uma viagem.
     /// </summary>
     [HttpDelete("{viagemId:guid}/alocar-van/{viagemVanId:guid}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ViagemGerenteResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoverVan(Guid viagemId, Guid viagemVanId, CancellationToken cancellationToken)
@@ -135,7 +165,11 @@ public class ViagensController : ControllerBase
         if (result.IsFailure)
             return new ObjectResult(result);
 
-        return Ok(result.Value);
+        var detalhe = await _viagemService.ObterPorGerenteAsync(gerenteId, viagemId, cancellationToken);
+        if (detalhe.IsFailure)
+            return new ObjectResult(detalhe);
+
+        return Ok(detalhe.Value);
     }
 
     /// <summary>
@@ -161,7 +195,7 @@ public class ViagensController : ControllerBase
     ///     Aloca um motorista a uma van da viagem.
     /// </summary>
     [HttpPost("{viagemId:guid}/alocar-motorista/{viagemVanId:guid}")]
-    [ProducesResponseType(typeof(ViagemResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ViagemGerenteResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AlocarMotorista(
@@ -176,7 +210,11 @@ public class ViagensController : ControllerBase
         if (result.IsFailure)
             return new ObjectResult(result);
 
-        return Ok(result.Value);
+        var detalhe = await _viagemService.ObterPorGerenteAsync(gerenteId, viagemId, cancellationToken);
+        if (detalhe.IsFailure)
+            return new ObjectResult(detalhe);
+
+        return Ok(detalhe.Value);
     }
 
     /// <summary>

@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 
-export default function ViagemDetalhePage() {
-  // Placeholder até Spec 60 — redireciona para a lista com toast informativo
-  redirect("/gerente/viagens?sucesso=redirecionado");
+export default async function ViagemDetalhePage({
+  params,
+}: {
+  params: Promise<{ viagemId: string }>;
+}) {
+  const { viagemId } = await params;
+  redirect(`/gerente/viagens/${viagemId}/relatorio`);
 }

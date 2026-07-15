@@ -1,5 +1,6 @@
 using VanBora.Application.DTOs.Viagens;
 using VanBora.Application.Interfaces;
+using VanBora.Application.Mappings;
 using VanBora.Domain.Common;
 using VanBora.Domain.Interfaces;
 using VanBora.Domain.Services;
@@ -24,8 +25,7 @@ public class RelatorioService : IRelatorioService
         Guid viagemId,
         CancellationToken cancellationToken = default)
     {
-        // 1. Buscar viagem com vans alocadas
-        var viagem = await _viagemRepo.GetByIdAsync(viagemId, cancellationToken);
+        var viagem = await _viagemRepo.GetByIdReadOnlyAsync(viagemId, cancellationToken);
         if (viagem is null)
             return Result<RelatorioResponse>.Failure(
                 Error.NotFound("VIAGEM_NAO_ENCONTRADA", "Viagem não encontrada."));
@@ -34,23 +34,41 @@ public class RelatorioService : IRelatorioService
             return Result<RelatorioResponse>.Failure(
                 Error.Forbidden("ACESSO_NEGADO", "Você não tem permissão para acessar o relatório desta viagem."));
 
-        // 2. Buscar todas as reservas da viagem
         var reservas = await _reservaRepo.GetByViagemIdAsync(viagemId, cancellationToken);
-
-        // 3. Delegar o cálculo para o domain service
         var dados = RelatorioViagem.Calcular(viagem, reservas);
 
-        // 4. Mapear para o DTO de resposta
         var response = new RelatorioResponse
         {
-            VansAlocadas = dados.VansAlocadas,
-            TotalAssentos = dados.TotalAssentos,
+            ViagemId = viagem.Id,
+            NomeEvento = viagem.NomeEvento,
+            DataEvento = viagem.DataEvento,
+            Origem = viagem.LocalPartida,
+            Destino = viagem.LocalEvento,
+            Status = viagem.Status.ToString(),
+            ReceitaTotal = dados.FaturamentoBruto,
+            TaxaPlataforma = dados.TaxaPlataforma,
+            FaturamentoLiquido = dados.FaturamentoLiquido,
             AssentosVendidos = dados.AssentosVendidos,
+            CapacidadeTotal = dados.TotalAssentos,
+            QuorumMinimo = viagem.QuorumMinimo,
+            PrecoAssento = viagem.PrecoAssento,
+            BreakEvenAtingido = dados.BreakEvenAtingido,
+            ViagemVanId = dados.PrimeiraViagemVanId,
+            VansAlocadas = dados.VansAlocadas,
             AssentosDisponiveis = dados.AssentosDisponiveis,
             ReservasConfirmadas = dados.ReservasConfirmadas,
-            FaturamentoBruto = dados.FaturamentoBruto,
-            TaxaPlataforma = dados.TaxaPlataforma,
-            FaturamentoLiquido = dados.FaturamentoLiquido
+            Passageiros = dados.Passageiros
+                .Select(p => new PassageiroRelatorioResponse
+                {
+                    NumeroAssento = p.NumeroAssento,
+                    NomePassageiro = p.NomePassageiro,
+                    TelefonePassageiro = string.IsNullOrEmpty(p.TelefoneCompleto)
+                        ? null
+                        : ViagemGerenteMapper.MascararTelefone(p.TelefoneCompleto),
+                    StatusPagamento = p.StatusPagamento,
+                    VanPlaca = p.VanPlaca
+                })
+                .ToList()
         };
 
         return Result<RelatorioResponse>.Success(response);

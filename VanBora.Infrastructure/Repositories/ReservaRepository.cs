@@ -57,7 +57,23 @@ public class ReservaRepository : IReservaRepository
             .AsNoTracking()
             .AsSplitQuery()
             .Where(r => r.ViagemVan!.ViagemId == viagemId)
+            .Include(r => r.Itens)
             .Include(r => r.ViagemVan)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<Reserva>> GetByViagemVanIdsAsync(
+        List<Guid> viagemVanIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (viagemVanIds.Count == 0)
+            return [];
+
+        return await _context.Reservas
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Where(r => viagemVanIds.Contains(r.ViagemVanId))
+            .Include(r => r.Itens)
             .ToListAsync(cancellationToken);
     }
 

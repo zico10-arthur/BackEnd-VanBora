@@ -29,7 +29,7 @@ export function LoginPageClient() {
     setLoading(true);
     try {
       const { redirectPainel } = await login(email, senha);
-      router.push(redirectPainel ? "/motorista/nova-viagem" : next);
+      router.push(redirectPainel ? "/gerente/dashboard" : next);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível entrar.");
     } finally {

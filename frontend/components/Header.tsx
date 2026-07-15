@@ -30,14 +30,17 @@ export function Header() {
               </Link>
               {isGerenteOuMotorista(user.perfis) ? (
                 <>
+                  <Link href="/gerente/dashboard" className={`${navLink} text-van-amber/90`}>
+                    Dashboard
+                  </Link>
+                  <Link href="/gerente/viagens" className={navLink}>
+                    Minhas Viagens
+                  </Link>
                   <Link href="/gerente/vans" className={navLink}>
                     Minhas Vans
                   </Link>
                   <Link href="/gerente/motoristas" className={navLink}>
                     Motoristas
-                  </Link>
-                  <Link href="/motorista/nova-viagem" className={`${navLink} text-van-amber/90`}>
-                    Painel
                   </Link>
                 </>
               ) : null}

@@ -180,5 +180,62 @@ export type ViagemGerenteResponse = {
   quorumMinimo: number;
   possuiIngresso: boolean;
   status: string;
+  receita: number;
+  totalReservas: number;
   vans: ViagemVanGerenteInfo[];
+};
+
+// ── Spec 60 — Relatório Financeiro ────────────────────────────────
+
+export type PassageiroRelatorio = {
+  numeroAssento: number;
+  nomePassageiro: string | null;
+  telefonePassageiro: string | null;
+  statusPagamento: string | null;
+  vanPlaca?: string | null;
+};
+
+export type RelatorioResponse = {
+  viagemId: string;
+  nomeEvento: string;
+  dataEvento: string;
+  origem: string;
+  destino: string;
+  status: string;
+  receitaTotal: number;
+  taxaPlataforma: number;
+  faturamentoLiquido: number;
+  assentosVendidos: number;
+  capacidadeTotal: number;
+  quorumMinimo: number;
+  precoAssento: number;
+  breakEvenAtingido: boolean;
+  viagemVanId: string | null;
+  vansAlocadas: number;
+  assentosDisponiveis: number;
+  reservasConfirmadas: number;
+  passageiros: PassageiroRelatorio[];
+};
+
+// ── Spec 10 — Dashboard ───────────────────────────────────────────
+
+export type ViagemResumo = {
+  viagemId: string;
+  nomeEvento: string;
+  dataPartida: string;
+  vanModelo: string;
+  vanPlaca: string;
+  assentosVendidos: number;
+  capacidade: number;
+  status: string;
+  receita: number;
+  totalReservas: number;
+};
+
+export type DashboardData = {
+  viagensAtivas: number;
+  totalReservas: number;
+  ocupacaoMedia: number;
+  receitaTotal: number;
+  viagensRecentes: ViagemResumo[];
 };
