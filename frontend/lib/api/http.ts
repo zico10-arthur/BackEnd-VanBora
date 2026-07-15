@@ -32,6 +32,8 @@ export function extractApiErrorMessage(status: number, body: unknown): { message
   if (msgTop) return { message: msgTop, code: codeTop };
 
   const title = typeof body.title === "string" ? body.title : undefined;
+  const detail = typeof body.detail === "string" ? body.detail : undefined;
+  if (detail) return { message: detail };
   if (title) return { message: title };
 
   return { message: `Erro HTTP ${status}` };

@@ -36,9 +36,12 @@ public class ExceptionMiddleware
     private async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
         context.Response.ContentType = "application/json";
-        context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 
         var isDomainException = exception is DomainException;
+        context.Response.StatusCode = isDomainException
+            ? (int)HttpStatusCode.BadRequest
+            : (int)HttpStatusCode.InternalServerError;
+
         var showRealMessage = _env.IsDevelopment() || isDomainException;
 
         var response = new

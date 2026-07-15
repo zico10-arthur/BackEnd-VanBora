@@ -44,7 +44,7 @@ public class Viagem
         Guard.AgainstNullOrWhiteSpace(localPartida, nameof(localPartida));
         Guard.AgainstNegativeOrZero(precoAssento, nameof(precoAssento));
         Guard.AgainstNegativeOrZero(quorumMinimo, nameof(quorumMinimo));
-        Guard.AgainstInvalidState(dataPartida >= dataEvento, "Data de partida deve ser anterior à data do evento.");
+        Guard.AgainstInvalidState(dataPartida < dataEvento, "Data de partida deve ser anterior à data do evento.");
 
         Id = Guid.NewGuid();
         GerenteUsuarioId = gerenteUsuarioId;
@@ -71,7 +71,7 @@ public class Viagem
         Guard.AgainstNullOrWhiteSpace(nomeEvento, nameof(nomeEvento));
         Guard.AgainstNullOrWhiteSpace(localEvento, nameof(localEvento));
         Guard.AgainstNullOrWhiteSpace(localPartida, nameof(localPartida));
-        Guard.AgainstInvalidState(dataPartida >= dataEvento, "Data de partida deve ser anterior à data do evento.");
+        Guard.AgainstInvalidState(dataPartida < dataEvento, "Data de partida deve ser anterior à data do evento.");
 
         NomeEvento = nomeEvento;
         DataEvento = dataEvento;

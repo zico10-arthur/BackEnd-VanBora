@@ -55,7 +55,7 @@ public static class Guard
     public static void AgainstInvalidState(bool condition, string message)
     {
         if (!condition)
-            throw new InvalidOperationException(message);
+            throw new DomainInvariantException(message);
     }
 
     public static void AgainstEmptyGuid(Guid value, string paramName)
