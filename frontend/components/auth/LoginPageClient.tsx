@@ -28,8 +28,8 @@ export function LoginPageClient() {
     setError(null);
     setLoading(true);
     try {
-      const { redirectPainel } = await login(email, senha);
-      router.push(redirectPainel ? "/gerente/dashboard" : next);
+      const { redirectPainel, redirectAdmin } = await login(email, senha);
+      router.push(redirectAdmin ? "/admin/dashboard" : redirectPainel ? "/gerente/dashboard" : next);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível entrar.");
     } finally {

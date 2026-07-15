@@ -102,6 +102,29 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    ///     Obtém os dados do perfil do usuário autenticado.
+    /// </summary>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>
+    ///     200 OK com os dados do usuário,
+    ///     ou o status HTTP correspondente ao erro via <see cref="Middleware.ResultFilter" />.
+    /// </returns>
+    [HttpGet("usuario")]
+    [Authorize]
+    [ProducesResponseType(typeof(AtualizarUsuarioResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ObterUsuario(CancellationToken cancellationToken)
+    {
+        var usuarioId = ObterUsuarioId();
+        var result = await _authService.ObterUsuarioAsync(usuarioId, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     ///     Atualiza os dados do perfil do usuário autenticado (US18).
     /// </summary>
     /// <param name="request">Dados a serem atualizados (nome, email, telefone, chavePix, CNH).</param>

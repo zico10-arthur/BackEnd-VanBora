@@ -1,5 +1,5 @@
 import { apiGet, apiPost } from "./http";
-import type { PagarReservaResponse, ReservaResponse } from "./types";
+import type { ContatoGerenteResponse, PagarReservaResponse, ReservaResponse } from "./types";
 
 export function criarReserva(body: {
   viagemVanId: string;
@@ -28,4 +28,8 @@ export function obterReserva(reservaId: string) {
 
 export function cancelarReserva(reservaId: string) {
   return apiPost<ReservaResponse>(`/api/reservas/${reservaId}/cancelar`, {}, true);
+}
+
+export function obterContatoGerente(reservaId: string) {
+  return apiGet<ContatoGerenteResponse>(`/api/reservas/${reservaId}/contato-gerente`, true);
 }

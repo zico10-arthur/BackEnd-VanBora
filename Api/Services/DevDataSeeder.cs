@@ -34,6 +34,8 @@ public class DevDataSeeder : IHostedService
         {
             await db.Database.MigrateAsync(cancellationToken);
 
+            await SeedAdminAsync(db, cancellationToken);
+
             if (await db.Viagens.AnyAsync(cancellationToken))
                 return;
 
@@ -81,4 +83,32 @@ public class DevDataSeeder : IHostedService
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    private const string AdminEmail = "admin@vanbora.com";
+    private const string AdminSenha = "Admin@123";
+
+    /// <summary>
+    /// Cria um usuário Admin padrão em Development, se ainda não existir nenhum.
+    /// Credenciais de desenvolvimento: admin@vanbora.com / Admin@123
+    /// </summary>
+    private async Task SeedAdminAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        if (await db.Usuarios.AnyAsync(u => u.Tipo == TipoUsuario.Admin, cancellationToken))
+            return;
+
+        var cpf = CPF.Criar("00000000000");
+        var email = Email.Criar(AdminEmail);
+        if (cpf.IsFailure || email.IsFailure) return;
+
+        var senhaHash = BCrypt.Net.BCrypt.HashPassword(AdminSenha);
+        var admin = Usuario.CriarAdmin("Administrador VanBora", cpf.Value, email.Value, senhaHash);
+
+        await db.Usuarios.AddAsync(admin, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "DevDataSeeder: usuário Admin criado. Login: {Email} / Senha: {Senha}",
+            AdminEmail,
+            AdminSenha);
+    }
 }

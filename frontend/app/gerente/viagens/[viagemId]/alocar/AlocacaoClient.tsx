@@ -101,7 +101,7 @@ export function AlocacaoClient({ viagemId }: { viagemId: string }) {
       .filter((vv) => vv.motoristaNome)
       .map((vv) => vv.motoristaNome!) ?? [],
   );
-  function availableMotoristasForVan(_viagemVanId: string): MotoristaResponse[] {
+  function availableMotoristasForVan(): MotoristaResponse[] {
     return motoristas.filter((m) => !allocatedMotoristaNomes.has(m.nome));
   }
 
@@ -339,7 +339,7 @@ export function AlocacaoClient({ viagemId }: { viagemId: string }) {
                       className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-van-amber focus:outline-none focus:ring-1 focus:ring-van-amber"
                     >
                       <option value="">Selecione um motorista…</option>
-                      {availableMotoristasForVan(vv.viagemVanId).map((m) => (
+                      {availableMotoristasForVan().map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.nome} — CNH: {m.cnh}
                         </option>

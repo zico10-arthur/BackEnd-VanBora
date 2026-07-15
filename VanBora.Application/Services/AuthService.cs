@@ -348,6 +348,19 @@ public class AuthService : IAuthService
         return Error.Validation(primeiroErro.ErrorCode, primeiroErro.ErrorMessage);
     }
 
+    // ── Obter dados do perfil do usuário autenticado ────────────────
+
+    public async Task<Result<AtualizarUsuarioResponse>> ObterUsuarioAsync(
+        Guid usuarioId,
+        CancellationToken cancellationToken = default)
+    {
+        var usuario = await _usuarioRepo.GetByIdAsync(usuarioId, cancellationToken);
+        if (usuario is null)
+            return Error.NotFound("USUARIO_NAO_ENCONTRADO", "Usuário não encontrado.");
+
+        return MontarRespostaAtualizacao(usuario);
+    }
+
     // ── US18: Atualizar Usuario (dados do perfil) ───────────────────
 
     public async Task<Result<AtualizarUsuarioResponse>> AtualizarUsuarioAsync(

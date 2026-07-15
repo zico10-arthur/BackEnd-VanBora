@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
-import { listarMinhasReservas } from "@/lib/api/reservas";
-import type { ReservaResponse } from "@/lib/api/types";
+import { listarMinhasReservas, obterContatoGerente } from "@/lib/api/reservas";
+import type { ContatoGerenteResponse, ReservaResponse } from "@/lib/api/types";
 import { formatBrl, formatDatePt } from "@/lib/format";
 import { seatNumberToLabel } from "@/lib/seats";
 import { useAuth } from "@/components/providers/AuthProvider";
@@ -15,6 +15,17 @@ export function MinhasReservasClient() {
   const [reservas, setReservas] = useState<ReservaResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [contatos, setContatos] = useState<Record<string, ContatoGerenteResponse | "loading" | "erro">>({});
+
+  async function handleVerContato(reservaId: string) {
+    setContatos((prev) => ({ ...prev, [reservaId]: "loading" }));
+    try {
+      const contato = await obterContatoGerente(reservaId);
+      setContatos((prev) => ({ ...prev, [reservaId]: contato }));
+    } catch {
+      setContatos((prev) => ({ ...prev, [reservaId]: "erro" }));
+    }
+  }
 
   useEffect(() => {
     if (!ready) return;
@@ -103,6 +114,33 @@ export function MinhasReservasClient() {
                   >
                     Continuar pagamento
                   </Link>
+                ) : null}
+
+                {r.status === "Confirmada" ? (
+                  <div className="mt-3">
+                    {!contatos[r.id] ? (
+                      <button
+                        type="button"
+                        onClick={() => handleVerContato(r.id)}
+                        className="text-sm font-medium text-van-amber underline"
+                      >
+                        Ver contato do organizador
+                      </button>
+                    ) : contatos[r.id] === "loading" ? (
+                      <p className="text-sm text-zinc-500">Buscando contato…</p>
+                    ) : contatos[r.id] === "erro" ? (
+                      <p className="text-sm text-red-400">Não foi possível obter o contato.</p>
+                    ) : (contatos[r.id] as ContatoGerenteResponse).possuiIngresso ? (
+                      <p className="text-sm text-zinc-300">
+                        Contato do organizador (ingresso à parte):{" "}
+                        <span className="font-semibold text-van-amber">
+                          {(contatos[r.id] as ContatoGerenteResponse).telefone ?? "não informado"}
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-zinc-500">Esta viagem não requer contato adicional.</p>
+                    )}
+                  </div>
                 ) : null}
               </li>
             ))}

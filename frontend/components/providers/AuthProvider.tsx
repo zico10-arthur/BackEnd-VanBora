@@ -14,6 +14,7 @@ import { ApiError } from "@/lib/api/http";
 import {
   clearAuthSession,
   getStoredUser,
+  isAdmin,
   isGerenteOuMotorista,
   setAuthSession,
   type StoredUser,
@@ -22,7 +23,7 @@ import {
 type AuthContextValue = {
   user: StoredUser | null;
   ready: boolean;
-  login: (email: string, senha: string) => Promise<{ redirectPainel: boolean }>;
+  login: (email: string, senha: string) => Promise<{ redirectPainel: boolean; redirectAdmin: boolean }>;
   logout: () => void;
   setUserFromToken: (token: string, user: StoredUser) => void;
 };
@@ -48,7 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     setAuthSession(data.token, stored);
     setUser(stored);
-    return { redirectPainel: isGerenteOuMotorista(stored.perfis) };
+    return {
+      redirectPainel: isGerenteOuMotorista(stored.perfis),
+      redirectAdmin: isAdmin(stored.perfis),
+    };
   }, []);
 
   const logout = useCallback(() => {
