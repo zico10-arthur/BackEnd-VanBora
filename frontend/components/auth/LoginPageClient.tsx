@@ -84,6 +84,11 @@ export function LoginPageClient() {
           Sou frotista
         </Link>
       </p>
+      <p className="mt-3 text-center text-xs text-zinc-500">
+        <Link href="/recuperar-senha" className="text-van-amber hover:underline">
+          Esqueci minha senha
+        </Link>
+      </p>
     </div>
   );
 }

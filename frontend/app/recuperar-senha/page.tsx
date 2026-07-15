@@ -1,11 +1,11 @@
 import { EsqueciSenhaCard } from "@/components/EsqueciSenhaCard";
 
 export const metadata = {
-  title: "Recuperar senha — VanBora Motorista",
-  description: "Solicite o código para criar uma nova senha de acesso ao painel.",
+  title: "Recuperar senha — VanBora",
+  description: "Solicite um código para criar uma nova senha de acesso.",
 };
 
-export default function MotoristaRecuperarSenhaPage() {
+export default function RecuperarSenhaPage() {
   return (
     <div className="min-h-screen bg-zinc-950">
       <div
@@ -14,9 +14,9 @@ export default function MotoristaRecuperarSenhaPage() {
       />
       <div className="relative flex min-h-screen flex-col items-center justify-center px-4 py-12">
         <EsqueciSenhaCard
-          backToLoginHref="/motorista/login"
+          backToLoginHref="/entrar"
           title="Recuperar senha"
-          subtitle="Motorista / frotista"
+          subtitle="VanBora"
         />
       </div>
     </div>

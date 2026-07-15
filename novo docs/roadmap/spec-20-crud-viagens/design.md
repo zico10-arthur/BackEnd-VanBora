@@ -1,6 +1,6 @@
 ---
 name: Gerenciamento de Viagens
-status: pendente
+status: auditada
 ---
 
 # Design — Spec 20: Gerenciamento de Viagens

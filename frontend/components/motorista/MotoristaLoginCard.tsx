@@ -61,6 +61,9 @@ export function MotoristaLoginCard() {
         <Link href="/cadastro/gerente" className={motoristaAuthSecondaryButtonClassName}>
           Cadastrar minha frota
         </Link>
+        <Link href="/motorista/recuperar-senha" className="text-center text-xs text-zinc-500 hover:text-van-amber transition-colors">
+          Esqueci minha senha
+        </Link>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 ---
 name: Gerenciamento de Viagens
-status: pendente
+status: auditada
 ---
 
 # Tasks — Spec 20: Gerenciamento de Viagens

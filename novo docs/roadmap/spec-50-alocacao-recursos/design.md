@@ -1,6 +1,6 @@
 ---
 name: Alocação de Recursos à Viagem
-status: pendente
+status: auditada
 ---
 
 # Design — Spec 50: Alocação de Recursos à Viagem

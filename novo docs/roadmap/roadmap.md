@@ -8,13 +8,14 @@
 
 | Spec # | Nome | Status | O que faz | Referência no visão.md |
 |--------|------|--------|-----------|------------------------|
-| 10 | Dashboard do Gerente | 🔴 pendente | Portal inicial pós-login com visão geral das viagens ativas, reservas e ocupação | Item 10 — Dashboard |
+| 10 | Dashboard do Gerente | 🟢 auditada | Portal inicial pós-login com visão geral das viagens ativas, reservas e ocupação | Item 10 — Dashboard |
 | 20 | Gerenciamento de Viagens | 🟢 auditada | Criar, listar, editar, cancelar viagens (evento + van + motorista + rota) | Item 6 — Viagens |
 | 21 | Correções na Criação de Viagens | 🟢 auditada | Alinhar frontend com DTOs reais do backend (localPartida, quorumMinimo) | Spec 20 — Viagens |
 | 30 | Gerenciamento de Vans | 🟢 auditada | Listar, cadastrar, editar, remover vans com validação de placa, ano, capacidade | Item 3 — Vans |
 | 40 | Gerenciamento de Motoristas | 🟢 auditada | Listar, cadastrar, editar, remover motoristas com validação de CPF, CNH, idade | Item 2 — Motoristas |
 | 50 | Alocação de Recursos à Viagem | 🟢 auditada | Alocar/remover van e motorista a uma viagem específica | Item 6 — Viagens |
-| 60 | Relatório Financeiro da Viagem | 🔴 pendente | Visualizar receita, ocupação, break-even e lista de embarque por viagem | Item 10 — Dashboard |
+| 60 | Relatório Financeiro da Viagem | 🟢 auditada | Visualizar receita, ocupação, break-even e lista de embarque por viagem | Item 10 — Dashboard |
+| 70 | Serviço de Email | 🟢 auditada | SMTP real + 5 fluxos: boas-vindas, redefinição de senha, confirmação de reserva, reembolso e exclusão de conta | Infraestrutura — email (visão.md §8) |
 
 ---
 
@@ -22,9 +23,9 @@
 
 | Status | Significado |
 |--------|-------------|
-| 🔴 pendente | Spec criada, frontend não iniciado |
-| 🟡 verified | Spec verificada — documentos completos, determinísticos e prontos para implementação |
-| 🟠 implementada | Código frontend concluído e integrado com backend |
+| 🔴 pendente | Spec proposta, implementação não iniciada |
+| 🟡 created | Spec documentada (requirements + design + task) — pronta para implementação |
+| 🟠 implementada | Código concluído e integrado |
 | 🟢 auditada | Testada, revisada e aprovada em produção |
 
 ---
@@ -58,6 +59,9 @@ Spec 50 — Alocação de Recursos à Viagem
 
 Spec 60 — Relatório Financeiro
   └── depende de: Spec 20 (precisa de viagem com reservas)
+
+Spec 70 — Serviço de Email
+  └── sem dependências (infraestrutura isolada)
 ```
 
 ---
@@ -67,8 +71,9 @@ Spec 60 — Relatório Financeiro
 ```
 1. Spec 30 — Vans           ← sem dependências, é a base
 2. Spec 40 — Motoristas     ← sem dependências, é a base
-3. Spec 20 — Viagens        ← depende de Vans e Motoristas
-4. Spec 50 — Alocação       ← depende de Viagens, Vans e Motoristas
-5. Spec 60 — Relatório      ← depende de Viagens (com reservas)
-6. Spec 10 — Dashboard      ← depende de tudo acima (visão consolidada)
+3. Spec 70 — Email          ← sem dependências, infraestrutura
+4. Spec 20 — Viagens        ← depende de Vans e Motoristas
+5. Spec 50 — Alocação       ← depende de Viagens, Vans e Motoristas
+6. Spec 60 — Relatório      ← depende de Viagens (com reservas)
+7. Spec 10 — Dashboard      ← depende de tudo acima (visão consolidada)
 ```

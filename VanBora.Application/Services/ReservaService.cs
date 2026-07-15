@@ -18,6 +18,8 @@ public class ReservaService : IReservaService
     private readonly IMapper _mapper;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPagamentoGateway _pagamentoGateway;
+    private readonly IEmailService _emailService;
+    private readonly IUsuarioRepository _usuarioRepo;
 
     public ReservaService(
         IReservaRepository reservaRepo,
@@ -25,7 +27,9 @@ public class ReservaService : IReservaService
         IValidator<CriarReservaRequest> validator,
         IMapper mapper,
         IUnitOfWork unitOfWork,
-        IPagamentoGateway pagamentoGateway)
+        IPagamentoGateway pagamentoGateway,
+        IEmailService emailService,
+        IUsuarioRepository usuarioRepo)
     {
         _reservaRepo = reservaRepo;
         _viagemVanRepo = viagemVanRepo;
@@ -33,6 +37,8 @@ public class ReservaService : IReservaService
         _mapper = mapper;
         _unitOfWork = unitOfWork;
         _pagamentoGateway = pagamentoGateway;
+        _emailService = emailService;
+        _usuarioRepo = usuarioRepo;
     }
 
     public async Task<Result<ReservaResponse>> CriarReservaAsync(
@@ -185,7 +191,10 @@ public class ReservaService : IReservaService
             // 19. Commitar transação
             await _unitOfWork.CommitAsync(cancellationToken);
 
-            // 20. Mapear para ReservaResponse e retornar Success
+            // 20. Enviar email de confirmação
+            await EnviarEmailConfirmacaoReservaAsync(reserva, cancellationToken);
+
+            // 21. Mapear para ReservaResponse e retornar Success
             var response = _mapper.Map<ReservaResponse>(reserva);
             return Result<ReservaResponse>.Success(response);
         }
@@ -299,6 +308,8 @@ public class ReservaService : IReservaService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        await EnviarEmailReembolsoAsync(reserva, cancellationToken);
+
         var response = _mapper.Map<ReservaResponse>(reserva);
         return Result<ReservaResponse>.Success(response);
     }
@@ -369,5 +380,39 @@ public class ReservaService : IReservaService
 
         if (reservasExpiradas.Count > 0)
             await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnviarEmailConfirmacaoReservaAsync(Reserva reserva, CancellationToken ct)
+    {
+        var primeiroItem = reserva.Itens.FirstOrDefault();
+        if (primeiroItem is null) return;
+
+        await _emailService.SendAsync(
+            primeiroItem.EmailPassageiro.Valor,
+            "Reserva confirmada - VanBora",
+            $"Olá {primeiroItem.NomePassageiro},\n\n" +
+            $"Sua reserva foi confirmada!\n\n" +
+            $"Assentos reservados: {reserva.Itens.Count}\n" +
+            $"Valor total: R$ {reserva.ValorTotal:0.00}\n\n" +
+            $"Código da reserva: {reserva.Id}\n\n" +
+            $"Obrigado por usar o VanBora!",
+            cancellationToken: ct);
+    }
+
+    private async Task EnviarEmailReembolsoAsync(Reserva reserva, CancellationToken ct)
+    {
+        var usuario = await _usuarioRepo.GetByIdAsync(reserva.UsuarioId, ct);
+        if (usuario?.Email is null) return;
+
+        await _emailService.SendAsync(
+            usuario.Email.Valor,
+            "Reembolso confirmado - VanBora",
+            $"Olá {usuario.Nome},\n\n" +
+            $"Sua reserva foi cancelada e o reembolso foi processado.\n\n" +
+            $"Valor reembolsado: R$ {reserva.ValorTotal:0.00}\n" +
+            $"Código da reserva: {reserva.Id}\n\n" +
+            $"O reembolso será creditado na mesma forma de pagamento utilizada na compra.\n\n" +
+            $"Qualquer dúvida, entre em contato com o vendedor pelo WhatsApp informado na viagem.",
+            cancellationToken: ct);
     }
 }

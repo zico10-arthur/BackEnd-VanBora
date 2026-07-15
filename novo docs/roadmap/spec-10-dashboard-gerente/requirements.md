@@ -1,6 +1,6 @@
 ---
 name: Dashboard do Gerente
-status: pendente
+status: auditada
 references:
   - visão.md: Item 10 — Dashboard
   - roadmap.md: Spec 10

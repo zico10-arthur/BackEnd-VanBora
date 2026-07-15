@@ -1,6 +1,6 @@
 ---
 name: Alocação de Recursos à Viagem
-status: pendente
+status: auditada
 references:
   - visão.md: Item 6 — Viagens
   - roadmap.md: Spec 50

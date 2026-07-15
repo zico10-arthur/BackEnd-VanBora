@@ -44,4 +44,12 @@ public interface IAuthService
         Guid usuarioId,
         ConfirmarExclusaoRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<Result<EsqueciSenhaResponse>> EsqueciSenhaAsync(
+        EsqueciSenhaRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<RedefinirSenhaResponse>> RedefinirSenhaAsync(
+        RedefinirSenhaRequest request,
+        CancellationToken cancellationToken = default);
 }

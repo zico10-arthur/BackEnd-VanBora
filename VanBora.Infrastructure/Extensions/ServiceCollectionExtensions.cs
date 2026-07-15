@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using VanBora.Application.Interfaces;
 using VanBora.Domain.Interfaces;
+using VanBora.Infrastructure.Configuration;
 using VanBora.Infrastructure.Data;
 using VanBora.Infrastructure.Repositories;
 using VanBora.Infrastructure.Services;
@@ -29,6 +30,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Services
+        services.Configure<EmailSettings>(configuration.GetSection(EmailSettings.SectionName));
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IEmailService, EmailService>();
 

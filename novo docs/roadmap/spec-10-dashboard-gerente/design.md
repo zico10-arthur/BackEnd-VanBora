@@ -1,6 +1,6 @@
 ---
 name: Dashboard do Gerente
-status: pendente
+status: auditada
 ---
 
 # Design — Spec 10: Dashboard do Gerente

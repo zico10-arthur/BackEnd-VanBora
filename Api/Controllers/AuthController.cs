@@ -374,4 +374,28 @@ public class AuthController : ControllerBase
 
         return Ok(result.Value);
     }
+
+    [HttpPost("esqueci-senha")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(EsqueciSenhaResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> EsqueciSenha(
+        [FromBody] EsqueciSenhaRequest request,
+        CancellationToken ct)
+    {
+        var result = await _authService.EsqueciSenhaAsync(request, ct);
+        return Ok(result.Value);
+    }
+
+    [HttpPost("redefinir-senha")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(RedefinirSenhaResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> RedefinirSenha(
+        [FromBody] RedefinirSenhaRequest request,
+        CancellationToken ct)
+    {
+        var result = await _authService.RedefinirSenhaAsync(request, ct);
+        if (result.IsFailure)
+            return BadRequest(result);
+        return Ok(result.Value);
+    }
 }

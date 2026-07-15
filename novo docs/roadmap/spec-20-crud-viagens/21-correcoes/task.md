@@ -1,6 +1,6 @@
 ---
 name: Correções na Criação de Viagens — Tasks
-status: created
+status: auditada
 ---
 
 # Spec 21 — Task Breakdown

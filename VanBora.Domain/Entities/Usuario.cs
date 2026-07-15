@@ -32,6 +32,10 @@ public class Usuario
     public string? CodigoExclusao { get; private set; }
     public DateTime? CodigoExclusaoExpiraEm { get; private set; }
 
+    // Redefinição de senha (Spec 70)
+    public string? CodigoResetSenha { get; private set; }
+    public DateTime? ExpiracaoCodigoResetSenha { get; private set; }
+
     // Navigation — APENAS auto-relacionamento Motorista → Gerente
     public Usuario? CriadoPorUsuario { get; private set; }
 
@@ -250,6 +254,26 @@ public class Usuario
         Guard.AgainstNull(cnh, nameof(cnh));
 
         CNH = cnh;
+        DataAtualizacao = DateTime.UtcNow;
+    }
+
+    public void DefinirCodigoResetSenha(string codigo, DateTime expiracao)
+    {
+        Guard.AgainstNullOrWhiteSpace(codigo, nameof(codigo));
+        CodigoResetSenha = codigo;
+        ExpiracaoCodigoResetSenha = expiracao;
+    }
+
+    public void LimparCodigoResetSenha()
+    {
+        CodigoResetSenha = null;
+        ExpiracaoCodigoResetSenha = null;
+    }
+
+    public void AlterarSenha(string senhaHash)
+    {
+        Guard.AgainstNullOrWhiteSpace(senhaHash, nameof(senhaHash));
+        SenhaHash = senhaHash;
         DataAtualizacao = DateTime.UtcNow;
     }
 }

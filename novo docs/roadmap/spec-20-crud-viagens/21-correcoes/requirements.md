@@ -1,6 +1,6 @@
 ---
 name: Correções na Criação de Viagens
-status: created
+status: auditada
 references:
   - spec-20 (Gerenciamento de Viagens)
   - backend: VanBora.Application/DTOs/Viagens/CriarViagemRequest.cs

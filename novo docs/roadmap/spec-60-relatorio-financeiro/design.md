@@ -1,6 +1,6 @@
 ---
 name: Relatório Financeiro da Viagem
-status: pendente
+status: auditada
 ---
 
 # Design — Spec 60: Relatório Financeiro da Viagem

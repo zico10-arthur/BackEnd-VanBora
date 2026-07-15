@@ -1,6 +1,6 @@
 ---
 name: Relatório Financeiro da Viagem
-status: pendente
+status: auditada
 references:
   - visão.md: Item 10 — Dashboard
   - roadmap.md: Spec 60

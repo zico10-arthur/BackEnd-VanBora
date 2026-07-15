@@ -17,19 +17,22 @@ public class MotoristaService : IMotoristaService
     private readonly IValidator<RegistrarMotoristaRequest> _validator;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly IEmailService _emailService;
 
     public MotoristaService(
         IUsuarioRepository repository,
         IViagemVanRepository viagemVanRepository,
         IValidator<RegistrarMotoristaRequest> validator,
         IMapper mapper,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IEmailService emailService)
     {
         _repository = repository;
         _viagemVanRepository = viagemVanRepository;
         _validator = validator;
         _mapper = mapper;
         _unitOfWork = unitOfWork;
+        _emailService = emailService;
     }
 
     public async Task<Result<RegistrarMotoristaResponse>> RegistrarMotorista(
@@ -122,6 +125,8 @@ public class MotoristaService : IMotoristaService
 
         await _repository.AddAsync(motorista, ct);
         await _unitOfWork.SaveChangesAsync(ct);
+
+        await EnviarEmailBoasVindasAsync(motorista, ct);
 
         var response = _mapper.Map<RegistrarMotoristaResponse>(motorista);
         return Result<RegistrarMotoristaResponse>.Success(response);
@@ -338,5 +343,18 @@ public class MotoristaService : IMotoristaService
 
         var response = _mapper.Map<RegistrarMotoristaResponse>(motorista);
         return Result<RegistrarMotoristaResponse>.Success(response);
+    }
+
+    private async Task EnviarEmailBoasVindasAsync(Usuario motorista, CancellationToken ct)
+    {
+        if (motorista.Email is null) return;
+
+        await _emailService.SendAsync(
+            motorista.Email.Valor,
+            "Bem-vindo(a) ao VanBora!",
+            $"Olá {motorista.Nome}, sua conta de motorista no VanBora foi criada com sucesso! " +
+            "Agora você pode acessar seu painel e visualizar as viagens alocadas a você. " +
+            "Acesse: http://localhost:3000/entrar",
+            cancellationToken: ct);
     }
 }

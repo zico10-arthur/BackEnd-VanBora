@@ -1,6 +1,6 @@
 ---
 name: Relatório Financeiro da Viagem
-status: pendente
+status: auditada
 ---
 
 # Tasks — Spec 60: Relatório Financeiro da Viagem

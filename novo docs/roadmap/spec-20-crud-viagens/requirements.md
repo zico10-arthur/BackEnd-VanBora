@@ -1,6 +1,6 @@
 ---
 name: Gerenciamento de Viagens
-status: pendente
+status: auditada
 references:
   - visão.md: Item 6 — Viagens
   - roadmap.md: Spec 20

@@ -172,6 +172,8 @@ public class AuthService : IAuthService
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitAsync(cancellationToken);
 
+            await EnviarEmailBoasVindasAsync(usuario, "Gerente", cancellationToken);
+
             return CriarRespostaGerente(usuario);
         }
         catch
@@ -236,6 +238,8 @@ public class AuthService : IAuthService
             return Result<RegistrarPassageiroResponse>.Failure(usuarioResult.Error);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        await EnviarEmailBoasVindasAsync(usuarioResult.Value, "Passageiro", cancellationToken);
 
         return MontarRespostaPassageiro(usuarioResult.Value);
     }
@@ -531,7 +535,7 @@ public class AuthService : IAuthService
                 emailDestino,
                 "Código de exclusão de conta - VanBora",
                 $"Seu código de exclusão de conta é: {codigo}. Ele expira em 10 minutos.",
-                cancellationToken);
+                cancellationToken: cancellationToken);
 
             if (emailResult.IsFailure)
                 return Error.Failure("ERRO_ENVIO_EMAIL", "Erro ao enviar o código de exclusão. Tente novamente.");
@@ -584,5 +588,86 @@ public class AuthService : IAuthService
 
         return Result<ConfirmarExclusaoResponse>.Success(
             new ConfirmarExclusaoResponse("Conta desativada com sucesso."));
+    }
+
+    private async Task EnviarEmailBoasVindasAsync(Usuario usuario, string perfil, CancellationToken ct)
+    {
+        if (usuario.Email is null) return;
+
+        var acaoPrincipal = perfil switch
+        {
+            "Gerente" => "cadastrar suas vans, motoristas e publicar viagens",
+            "Passageiro" => "buscar viagens e reservar assentos para eventos",
+            _ => "acessar a plataforma"
+        };
+
+        await _emailService.SendAsync(
+            usuario.Email.Valor,
+            "Bem-vindo(a) ao VanBora!",
+            $"Olá {usuario.Nome}, sua conta no VanBora foi criada com sucesso! " +
+            $"Agora você pode {acaoPrincipal}. " +
+            "Acesse: http://localhost:3000/entrar",
+            cancellationToken: ct);
+    }
+
+    public async Task<Result<EsqueciSenhaResponse>> EsqueciSenhaAsync(
+        EsqueciSenhaRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var emailValue = Email.Criar(request.Email);
+        if (emailValue.IsFailure)
+            return Result<EsqueciSenhaResponse>.Success(
+                new EsqueciSenhaResponse("Se o email estiver cadastrado, um código de redefinição foi enviado."));
+
+        var usuario = await _usuarioRepo.GetByEmailAsync(emailValue.Value, cancellationToken);
+
+        if (usuario is null)
+            return Result<EsqueciSenhaResponse>.Success(
+                new EsqueciSenhaResponse("Se o email estiver cadastrado, um código de redefinição foi enviado."));
+
+        var codigo = Random.Shared.Next(100000, 999999).ToString();
+        usuario.DefinirCodigoResetSenha(codigo, DateTime.UtcNow.AddMinutes(15));
+
+        _usuarioRepo.Update(usuario);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        await _emailService.SendAsync(
+            usuario.Email!.Valor,
+            "Código de redefinição de senha - VanBora",
+            $"Seu código de redefinição de senha é: {codigo}. " +
+            "Ele expira em 15 minutos. Se você não solicitou a redefinição, ignore este email.",
+            cancellationToken: cancellationToken);
+
+        return Result<EsqueciSenhaResponse>.Success(
+            new EsqueciSenhaResponse("Se o email estiver cadastrado, um código de redefinição foi enviado."));
+    }
+
+    public async Task<Result<RedefinirSenhaResponse>> RedefinirSenhaAsync(
+        RedefinirSenhaRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var emailValue = Email.Criar(request.Email);
+        if (emailValue.IsFailure)
+            return Result<RedefinirSenhaResponse>.Failure(
+                Error.Failure("CODIGO_INVALIDO", "Código inválido ou expirado."));
+
+        var usuario = await _usuarioRepo.GetByEmailAsync(emailValue.Value, cancellationToken);
+
+        if (usuario is null ||
+            string.IsNullOrWhiteSpace(usuario.CodigoResetSenha) ||
+            usuario.CodigoResetSenha != request.Codigo ||
+            usuario.ExpiracaoCodigoResetSenha < DateTime.UtcNow)
+            return Result<RedefinirSenhaResponse>.Failure(
+                Error.Failure("CODIGO_INVALIDO", "Código inválido ou expirado."));
+
+        var senhaHash = BCrypt.Net.BCrypt.HashPassword(request.NovaSenha);
+        usuario.AlterarSenha(senhaHash);
+        usuario.LimparCodigoResetSenha();
+
+        _usuarioRepo.Update(usuario);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result<RedefinirSenhaResponse>.Success(
+            new RedefinirSenhaResponse("Senha redefinida com sucesso."));
     }
 }

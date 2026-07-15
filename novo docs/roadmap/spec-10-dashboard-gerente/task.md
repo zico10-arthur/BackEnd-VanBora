@@ -1,6 +1,6 @@
 ---
 name: Dashboard do Gerente
-status: pendente
+status: auditada
 ---
 
 # Tasks — Spec 10: Dashboard do Gerente

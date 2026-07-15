@@ -1,6 +1,6 @@
 ---
 name: Correções na Criação de Viagens — Design
-status: created
+status: auditada
 ---
 
 # Spec 21 — Design de Implementação
