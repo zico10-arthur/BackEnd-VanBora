@@ -52,12 +52,13 @@ public class DevDataSeeder : IHostedService
             var van = new Van(gerente.Id, "Van Nilton", placa.Value, "Mercedes Sprinter", 17);
             await db.Vans.AddAsync(van, cancellationToken);
 
+            var dataEvento = DateTime.UtcNow.AddDays(14);
             var viagem = new Viagem(
                 gerente.Id,
                 "Botafogo x Flamengo",
-                DateTime.UtcNow.AddDays(14),
+                dataEvento,
                 "Estádio Nilton Santos",
-                DateTime.UtcNow.AddDays(14).AddHours(-3),
+                dataEvento.AddHours(-3),
                 "Shopping Nova América — saída 14h",
                 89.90m,
                 true,

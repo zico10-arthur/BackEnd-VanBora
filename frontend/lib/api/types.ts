@@ -81,3 +81,104 @@ export type PagarReservaResponse = {
   valorAPagar: number;
   expiraEm: string;
 };
+
+// ── Spec 30 — Vans ────────────────────────────────────────────────
+
+export type VanResponse = {
+  id: string;
+  nome: string;
+  placa: string;
+  modelo: string;
+  capacidade: number;
+  ativo: boolean;
+  criadoEm: string;
+};
+
+export type CriarVanRequest = {
+  nome: string;
+  placa: string;
+  modelo: string;
+  capacidade: number;
+};
+
+export type AtualizarVanRequest = {
+  nome: string;
+  placa: string;
+};
+
+// ── Spec 40 — Motoristas ────────────────────────────────────────────
+
+export type MotoristaResponse = {
+  id: string;
+  tipo: string;
+  nome: string;
+  cpf: string;
+  email: string | null;
+  telefone: string | null;
+  ativo: boolean;
+  criadoEm: string;
+  dataAtualizacao: string | null;
+  cnh: string;
+  criadoPorUsuarioId: string;
+};
+
+export type CriarMotoristaRequest = {
+  nome: string;
+  cpf: string;
+  telefone: string | null;
+  cnh: string;
+};
+
+// ── Spec 50 — Alocação de Recursos ──────────────────────────────────
+
+export type AlocarVanRequest = {
+  vanId: string; // GUID da van
+};
+
+export type AlocarMotoristaRequest = {
+  motoristaId: string; // GUID do motorista (Usuario com Tipo=Motorista)
+  viagemVanId: string; // GUID do ViagemVan — obtido após alocarVan()
+};
+
+export type CriarViagemRequest = {
+  nomeEvento: string;
+  dataEvento: string;
+  localEvento: string;
+  dataPartida: string;
+  localPartida: string;
+  precoAssento: number;
+  possuiIngresso: boolean;
+  quorumMinimo: number;
+};
+
+export type AtualizarViagemRequest = {
+  nomeEvento: string;
+  dataEvento: string;
+  localEvento: string;
+  dataPartida: string;
+  localPartida: string;
+  possuiIngresso: boolean;
+};
+
+export type ViagemVanGerenteInfo = {
+  viagemVanId: string;
+  vanModelo: string;
+  vanPlaca: string;
+  capacidade: number;
+  assentosVendidos: number;
+  motoristaNome: string | null;
+};
+
+export type ViagemGerenteResponse = {
+  viagemId: string;
+  nomeEvento: string;
+  dataEvento: string;
+  localEvento: string;
+  dataPartida: string;
+  localPartida: string;
+  precoAssento: number;
+  quorumMinimo: number;
+  possuiIngresso: boolean;
+  status: string;
+  vans: ViagemVanGerenteInfo[];
+};

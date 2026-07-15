@@ -22,7 +22,7 @@ public sealed class CriarVanValidator : AbstractValidator<CriarVanRequest>
             .MaximumLength(100);
 
         RuleFor(x => x.Capacidade)
-            .GreaterThanOrEqualTo(10)
-            .WithMessage("Capacidade mínima é 10 passageiros.");
+            .GreaterThanOrEqualTo(9)
+            .WithMessage("Capacidade mínima é 9 lugares.");
     }
 }

@@ -29,9 +29,17 @@ export function Header() {
                 Minhas reservas
               </Link>
               {isGerenteOuMotorista(user.perfis) ? (
-                <Link href="/motorista/nova-viagem" className={`${navLink} text-van-amber/90`}>
-                  Painel
-                </Link>
+                <>
+                  <Link href="/gerente/vans" className={navLink}>
+                    Minhas Vans
+                  </Link>
+                  <Link href="/gerente/motoristas" className={navLink}>
+                    Motoristas
+                  </Link>
+                  <Link href="/motorista/nova-viagem" className={`${navLink} text-van-amber/90`}>
+                    Painel
+                  </Link>
+                </>
               ) : null}
               <button
                 type="button"
@@ -50,7 +58,7 @@ export function Header() {
                 Entrar
               </Link>
               <Link
-                href="/cadastro/passageiro"
+                href="/cadastro"
                 className="rounded-xl bg-van-amber px-4 py-2 text-sm font-bold text-van-void transition hover:brightness-110"
               >
                 Criar conta
