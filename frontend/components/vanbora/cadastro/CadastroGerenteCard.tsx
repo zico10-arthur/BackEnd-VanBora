@@ -46,7 +46,7 @@ export function CadastroGerenteCard() {
         email: email.trim(),
         perfis: [res.tipo || "Gerente"],
       });
-      router.push("/motorista/nova-viagem");
+      router.push("/gerente/dashboard");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Erro no cadastro.");
     } finally {

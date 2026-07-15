@@ -2,6 +2,7 @@ using AutoMapper;
 using FluentValidation;
 using VanBora.Application.DTOs.Viagens;
 using VanBora.Application.Interfaces;
+using VanBora.Application.Mappings;
 using VanBora.Domain.Common;
 using VanBora.Domain.Entities;
 using VanBora.Domain.Enums;
@@ -14,6 +15,7 @@ public class ViagemService : IViagemService
     private readonly IViagemRepository _viagemRepo;
     private readonly IVanRepository _vanRepo;
     private readonly IViagemVanRepository _viagemVanRepo;
+    private readonly IReservaRepository _reservaRepo;
     private readonly IMapper _mapper;
     private readonly IValidator<CriarViagemRequest> _criarValidator;
     private readonly IValidator<AtualizarViagemRequest> _atualizarValidator;
@@ -27,6 +29,7 @@ public class ViagemService : IViagemService
         IViagemRepository viagemRepo,
         IVanRepository vanRepo,
         IViagemVanRepository viagemVanRepo,
+        IReservaRepository reservaRepo,
         IMapper mapper,
         IValidator<CriarViagemRequest> criarValidator,
         IValidator<AtualizarViagemRequest> atualizarValidator,
@@ -37,6 +40,7 @@ public class ViagemService : IViagemService
         _viagemRepo = viagemRepo;
         _vanRepo = vanRepo;
         _viagemVanRepo = viagemVanRepo;
+        _reservaRepo = reservaRepo;
         _mapper = mapper;
         _criarValidator = criarValidator;
         _atualizarValidator = atualizarValidator;
@@ -91,6 +95,24 @@ public class ViagemService : IViagemService
         return Result<ViagemResponse>.Success(response);
     }
 
+    public async Task<Result<ViagemGerenteResponse>> ObterPorGerenteAsync(
+        Guid gerenteUsuarioId,
+        Guid viagemId,
+        CancellationToken cancellationToken = default)
+    {
+        var viagem = await _viagemRepo.GetByIdReadOnlyAsync(viagemId, cancellationToken);
+        if (viagem is null)
+            return Result<ViagemGerenteResponse>.Failure(
+                Error.NotFound("VIAGEM_NAO_ENCONTRADA", "Viagem não encontrada."));
+
+        if (viagem.GerenteUsuarioId != gerenteUsuarioId)
+            return Result<ViagemGerenteResponse>.Failure(
+                Error.Forbidden("ACESSO_NEGADO", "Você não tem permissão para acessar esta viagem."));
+
+        return Result<ViagemGerenteResponse>.Success(
+            await MapearGerenteComEstatisticasAsync(viagem, cancellationToken));
+    }
+
     public async Task<Result<List<ViagemResponse>>> ListarDisponiveisAsync(
         CancellationToken cancellationToken = default)
     {
@@ -100,14 +122,47 @@ public class ViagemService : IViagemService
         return Result<List<ViagemResponse>>.Success(response);
     }
 
-    public async Task<Result<List<ViagemResponse>>> ListarPorGerenteAsync(
+    public async Task<Result<List<ViagemGerenteResponse>>> ListarPorGerenteAsync(
         Guid gerenteUsuarioId,
         CancellationToken cancellationToken = default)
     {
         var viagens = await _viagemRepo.GetByGerenteUsuarioIdAsync(gerenteUsuarioId, cancellationToken);
+        var viagemVanIds = viagens.SelectMany(v => v.ViagemVans.Select(vv => vv.Id)).ToList();
+        var reservas = await _reservaRepo.GetByViagemVanIdsAsync(viagemVanIds, cancellationToken);
+        var ocupacao = await _reservaRepo.GetAssentosOcupadosPorViagemVansAsync(viagemVanIds, cancellationToken);
 
-        var response = _mapper.Map<List<ViagemResponse>>(viagens);
-        return Result<List<ViagemResponse>>.Success(response);
+        var assentosVendidosPorVan = ocupacao.ToDictionary(
+            kv => kv.Key,
+            kv => kv.Value.Count);
+
+        var reservasPorViagem = reservas
+            .GroupBy(r => r.ViagemVanId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var response = viagens
+            .Select(viagem =>
+            {
+                var reservasDaViagem = viagem.ViagemVans
+                    .SelectMany(vv =>
+                        reservasPorViagem.TryGetValue(vv.Id, out var list) ? list : [])
+                    .ToList();
+
+                return ViagemGerenteMapper.Map(viagem, assentosVendidosPorVan, reservasDaViagem);
+            })
+            .ToList();
+
+        return Result<List<ViagemGerenteResponse>>.Success(response);
+    }
+
+    private async Task<ViagemGerenteResponse> MapearGerenteComEstatisticasAsync(
+        Viagem viagem,
+        CancellationToken cancellationToken)
+    {
+        var viagemVanIds = viagem.ViagemVans.Select(vv => vv.Id).ToList();
+        var reservas = await _reservaRepo.GetByViagemVanIdsAsync(viagemVanIds, cancellationToken);
+        var ocupacao = await _reservaRepo.GetAssentosOcupadosPorViagemVansAsync(viagemVanIds, cancellationToken);
+        var assentosVendidosPorVan = ocupacao.ToDictionary(kv => kv.Key, kv => kv.Value.Count);
+        return ViagemGerenteMapper.Map(viagem, assentosVendidosPorVan, reservas);
     }
 
     public async Task<Result<ViagemResponse>> AtualizarAsync(

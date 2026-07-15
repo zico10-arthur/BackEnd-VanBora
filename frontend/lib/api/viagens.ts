@@ -5,6 +5,7 @@ import type {
   CriarViagemRequest,
   AtualizarViagemRequest,
   ViagemGerenteResponse,
+  RelatorioResponse,
   AlocarVanRequest,
   AlocarMotoristaRequest,
 } from "./types";
@@ -25,6 +26,12 @@ export function listarViagensGerente(): Promise<ViagemGerenteResponse[]> {
 
 export function obterViagemGerente(id: string): Promise<ViagemGerenteResponse> {
   return apiGet<ViagemGerenteResponse>(`/api/gerente/viagens/${id}`, true);
+}
+
+// ── Spec 60 — Relatório Financeiro ────────────────────────────────
+
+export function obterRelatorio(viagemId: string): Promise<RelatorioResponse> {
+  return apiGet<RelatorioResponse>(`/api/gerente/viagens/${viagemId}/relatorio`, true);
 }
 
 export function criarViagemGerente(

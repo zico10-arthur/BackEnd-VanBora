@@ -37,7 +37,7 @@ export function ViagensListClient({ sucesso }: { sucesso: string | null }) {
         setToastMessage("Esta viagem não pode ser editada (status diferente de Agendada).");
         setToastType("error");
       } else if (sucesso === "redirecionado") {
-        setToastMessage("Detalhes da viagem estarão disponíveis em breve.");
+        setToastMessage("Abrindo relatório da viagem…");
         setToastType("success");
       }
       router.replace("/gerente/viagens", { scroll: false });
@@ -160,7 +160,7 @@ export function ViagensListClient({ sucesso }: { sucesso: string | null }) {
                   <ViagemRow
                     key={v.viagemId}
                     viagem={v}
-                    onView={() => router.push(`/gerente/viagens/${v.viagemId}`)}
+                    onView={() => router.push(`/gerente/viagens/${v.viagemId}/relatorio`)}
                     onEdit={() => router.push(`/gerente/viagens/${v.viagemId}/editar`)}
                     onCancel={() => setCancelTarget(v)}
                   />

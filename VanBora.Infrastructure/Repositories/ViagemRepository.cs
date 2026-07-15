@@ -20,8 +20,23 @@ public class ViagemRepository : IViagemRepository
     public async Task<Viagem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.Viagens
+            .AsSplitQuery()
             .Include(v => v.ViagemVans)
             .ThenInclude(vv => vv.Van)
+            .Include(v => v.ViagemVans)
+            .ThenInclude(vv => vv.MotoristaUsuario)
+            .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
+    }
+
+    public async Task<Viagem?> GetByIdReadOnlyAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Viagens
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(v => v.ViagemVans)
+            .ThenInclude(vv => vv.Van)
+            .Include(v => v.ViagemVans)
+            .ThenInclude(vv => vv.MotoristaUsuario)
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
     }
 
@@ -33,7 +48,9 @@ public class ViagemRepository : IViagemRepository
             .Where(v => v.GerenteUsuarioId == gerenteUsuarioId)
             .Include(v => v.ViagemVans)
             .ThenInclude(vv => vv.Van)
-            .OrderBy(v => v.DataEvento)
+            .Include(v => v.ViagemVans)
+            .ThenInclude(vv => vv.MotoristaUsuario)
+            .OrderBy(v => v.DataPartida)
             .ToListAsync(cancellationToken);
     }
 
