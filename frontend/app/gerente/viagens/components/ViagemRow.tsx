@@ -11,7 +11,7 @@ type ViagemRowProps = {
   onCancel: () => void;
 };
 
-function badgeClass(status: string): string {
+function statusBadgeClass(status: string): string {
   switch (status) {
     case "Agendada":
       return "bg-emerald-950/60 text-emerald-300 border-emerald-700/60";
@@ -26,11 +26,34 @@ function badgeClass(status: string): string {
   }
 }
 
+function alocacaoBadge(viagem: ViagemGerenteResponse): {
+  label: string;
+  className: string;
+} {
+  const hasVans = viagem.vans.length > 0;
+  const allHaveMotorista = hasVans && viagem.vans.every((v) => v.motoristaNome);
+
+  if (hasVans && allHaveMotorista) {
+    return {
+      label: "Completa",
+      className:
+        "bg-emerald-950/60 text-emerald-300 border-emerald-700/60",
+    };
+  }
+  return {
+    label: "Pendente",
+    className:
+      "bg-yellow-950/60 text-yellow-400 border-yellow-700/60",
+  };
+}
+
 export function ViagemRow({ viagem, onView, onEdit, onCancel }: ViagemRowProps) {
   const isAgendada = viagem.status === "Agendada";
 
   const totalVendidos = viagem.vans.reduce((sum, v) => sum + v.assentosVendidos, 0);
   const totalCapacidade = viagem.vans.reduce((sum, v) => sum + v.capacidade, 0);
+
+  const aloc = alocacaoBadge(viagem);
 
   return (
     <tr className="border-b border-zinc-800 transition hover:bg-zinc-900/50">
@@ -45,21 +68,13 @@ export function ViagemRow({ viagem, onView, onEdit, onCancel }: ViagemRowProps) 
         {formatDateTime(viagem.dataPartida)}
       </td>
 
-      {/* Alocação */}
+      {/* Alocação — badge de completude (Spec 50) */}
       <td className="px-4 py-4">
-        {viagem.vans.length > 0 ? (
-          <div className="space-y-1">
-            {viagem.vans.map((v) => (
-              <p key={v.viagemVanId} className="text-sm text-zinc-300">
-                {v.vanModelo} — {v.motoristaNome ?? "Sem motorista"}
-              </p>
-            ))}
-          </div>
-        ) : (
-          <span className="inline-flex items-center rounded-full border border-yellow-700/60 bg-yellow-950/60 px-2.5 py-0.5 text-xs font-medium text-yellow-400">
-            Pendente alocação
-          </span>
-        )}
+        <span
+          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${aloc.className}`}
+        >
+          {aloc.label}
+        </span>
       </td>
 
       {/* Assentos */}
@@ -70,7 +85,7 @@ export function ViagemRow({ viagem, onView, onEdit, onCancel }: ViagemRowProps) 
       {/* Status */}
       <td className="px-4 py-4">
         <span
-          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${badgeClass(viagem.status)}`}
+          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(viagem.status)}`}
         >
           {viagem.status}
         </span>

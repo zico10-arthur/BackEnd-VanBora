@@ -129,25 +129,36 @@ export type CriarMotoristaRequest = {
   cnh: string;
 };
 
-// ── Spec 20 — Viagens (Gerente) ──────────────────────────────────
+// ── Spec 50 — Alocação de Recursos ──────────────────────────────────
+
+export type AlocarVanRequest = {
+  vanId: string; // GUID da van
+};
+
+export type AlocarMotoristaRequest = {
+  motoristaId: string; // GUID do motorista (Usuario com Tipo=Motorista)
+  viagemVanId: string; // GUID do ViagemVan — obtido após alocarVan()
+};
 
 export type CriarViagemRequest = {
   nomeEvento: string;
   dataEvento: string;
   localEvento: string;
-  origemDescricao: string;
-  origemCidade: string;
-  origemEstado: string;
-  destinoDescricao: string;
-  destinoCidade: string;
-  destinoEstado: string;
-  dataSaida: string;
-  dataChegada: string;
+  dataPartida: string;
+  localPartida: string;
   precoAssento: number;
   possuiIngresso: boolean;
+  quorumMinimo: number;
 };
 
-export type AtualizarViagemRequest = CriarViagemRequest;
+export type AtualizarViagemRequest = {
+  nomeEvento: string;
+  dataEvento: string;
+  localEvento: string;
+  dataPartida: string;
+  localPartida: string;
+  possuiIngresso: boolean;
+};
 
 export type ViagemVanGerenteInfo = {
   viagemVanId: string;
@@ -162,10 +173,11 @@ export type ViagemGerenteResponse = {
   viagemId: string;
   nomeEvento: string;
   dataEvento: string;
+  localEvento: string;
   dataPartida: string;
-  origem: string;
-  destino: string;
+  localPartida: string;
   precoAssento: number;
+  quorumMinimo: number;
   possuiIngresso: boolean;
   status: string;
   vans: ViagemVanGerenteInfo[];

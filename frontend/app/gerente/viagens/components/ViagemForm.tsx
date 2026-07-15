@@ -1,31 +1,62 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { VbButton } from "@/components/vanbora/ui/VbButton";
-import type { CriarViagemRequest, ViagemGerenteResponse } from "@/lib/api/types";
+import type {
+  CriarViagemRequest,
+  ViagemGerenteResponse,
+  VanResponse,
+  MotoristaResponse,
+} from "@/lib/api/types";
 import { ApiError } from "@/lib/api/http";
 
-type FieldErrors = Partial<Record<keyof CriarViagemRequest | "api", string>>;
+type FieldErrors = Partial<Record<
+  "nomeEvento" | "dataEvento" | "localEvento" | "dataPartida" |
+  "localPartida" | "precoAssento" | "quorumMinimo" | "api" |
+  "vanId" | "motoristaId",
+  string
+>>;
 
 type ViagemFormProps = {
   viagem?: ViagemGerenteResponse;
   onSubmit: (data: CriarViagemRequest) => Promise<void>;
   submitLabel: string;
+  // ── Spec 50 — Alocação ──
+  vans?: VanResponse[];
+  motoristas?: MotoristaResponse[];
+  vanId?: string;
+  motoristaId?: string;
+  onVanChange?: (vanId: string) => void;
+  onMotoristaChange?: (motoristaId: string) => void;
+  loadingRecursos?: boolean;
+  erroRecursos?: string | null;
+  onRetryRecursos?: () => void;
 };
 
-export function ViagemForm({ viagem, onSubmit, submitLabel }: ViagemFormProps) {
+export function ViagemForm({
+  viagem,
+  onSubmit,
+  submitLabel,
+  vans = [],
+  motoristas = [],
+  vanId = "",
+  motoristaId = "",
+  onVanChange = () => {},
+  onMotoristaChange = () => {},
+  loadingRecursos = false,
+  erroRecursos = null,
+  onRetryRecursos = () => {},
+}: ViagemFormProps) {
+  const isEdit = !!viagem;
+
   const [nomeEvento, setNomeEvento] = useState(viagem?.nomeEvento ?? "");
   const [dataEvento, setDataEvento] = useState(viagem?.dataEvento ? viagem.dataEvento.slice(0, 16) : "");
-  const [localEvento, setLocalEvento] = useState("");
-  const [origemDescricao, setOrigemDescricao] = useState("");
-  const [origemCidade, setOrigemCidade] = useState("");
-  const [origemEstado, setOrigemEstado] = useState("");
-  const [destinoDescricao, setDestinoDescricao] = useState("");
-  const [destinoCidade, setDestinoCidade] = useState("");
-  const [destinoEstado, setDestinoEstado] = useState("");
-  const [dataSaida, setDataSaida] = useState(viagem?.dataPartida ? viagem.dataPartida.slice(0, 16) : "");
-  const [dataChegada, setDataChegada] = useState("");
+  const [localEvento, setLocalEvento] = useState(viagem?.localEvento ?? "");
+  const [localPartida, setLocalPartida] = useState(viagem?.localPartida ?? "");
+  const [dataPartida, setDataPartida] = useState(viagem?.dataPartida ? viagem.dataPartida.slice(0, 16) : "");
   const [precoAssento, setPrecoAssento] = useState(viagem?.precoAssento?.toString() ?? "");
+  const [quorumMinimo, setQuorumMinimo] = useState(viagem?.quorumMinimo?.toString() ?? "");
   const [possuiIngresso, setPossuiIngresso] = useState(viagem?.possuiIngresso ?? false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -34,43 +65,33 @@ export function ViagemForm({ viagem, onSubmit, submitLabel }: ViagemFormProps) {
     const errs: FieldErrors = {};
     const now = new Date();
 
-    if (!nomeEvento.trim()) errs.nomeEvento = "Informe o nome do evento.";
-    if (!dataEvento) errs.dataEvento = "Informe a data do evento.";
+    if (!nomeEvento.trim()) errs.nomeEvento = "Nome do evento é obrigatório.";
+    else if (nomeEvento.trim().length > 200) errs.nomeEvento = "Nome do evento deve ter no máximo 200 caracteres.";
+
+    if (!dataEvento) errs.dataEvento = "Data do evento é obrigatória.";
     else if (new Date(dataEvento) <= now) errs.dataEvento = "Data do evento deve ser futura.";
 
-    if (!localEvento.trim()) errs.localEvento = "Informe o local do evento.";
+    if (!localEvento.trim()) errs.localEvento = "Local do evento é obrigatório.";
+    else if (localEvento.trim().length > 300) errs.localEvento = "Local do evento deve ter no máximo 300 caracteres.";
 
-    if (!origemDescricao.trim()) errs.origemDescricao = "Informe a descrição da origem.";
-    if (!origemCidade.trim()) errs.origemCidade = "Informe a cidade de origem.";
-    if (!origemEstado.trim() || origemEstado.trim().length !== 2)
-      errs.origemEstado = "UF inválida.";
+    if (!dataPartida) errs.dataPartida = "Data de partida é obrigatória.";
+    else if (new Date(dataPartida) <= now) errs.dataPartida = "Data de partida deve ser futura.";
+    else if (dataEvento && new Date(dataPartida) >= new Date(dataEvento))
+      errs.dataPartida = "Data de partida deve ser anterior à data do evento.";
 
-    if (!destinoDescricao.trim()) errs.destinoDescricao = "Informe a descrição do destino.";
-    if (!destinoCidade.trim()) errs.destinoCidade = "Informe a cidade de destino.";
-    if (!destinoEstado.trim() || destinoEstado.trim().length !== 2)
-      errs.destinoEstado = "UF inválida.";
-
-    if (!dataSaida) errs.dataSaida = "Informe a data de saída.";
-    else if (new Date(dataSaida) <= now) errs.dataSaida = "Data de saída deve ser futura.";
-
-    if (!dataChegada) errs.dataChegada = "Informe a data de chegada.";
-    else if (dataSaida && new Date(dataChegada) <= new Date(dataSaida))
-      errs.dataChegada = "Data de chegada deve ser posterior à saída.";
+    if (!localPartida.trim()) errs.localPartida = "Informe o local de partida.";
+    else if (localPartida.trim().length > 300) errs.localPartida = "Local de partida deve ter no máximo 300 caracteres.";
 
     const preco = Number(precoAssento);
     if (!precoAssento || isNaN(preco) || preco <= 0) errs.precoAssento = "Preço deve ser maior que zero.";
 
-    // Origem e destino iguais (mesma cidade + estado) → erro
-    if (
-      origemCidade.trim() &&
-      destinoCidade.trim() &&
-      origemEstado.trim() &&
-      destinoEstado.trim() &&
-      origemCidade.trim() === destinoCidade.trim() &&
-      origemEstado.trim() === destinoEstado.trim()
-    ) {
-      errs.destinoCidade = "Origem e destino não podem ser iguais.";
-    }
+    const q = Number(quorumMinimo);
+    if (!quorumMinimo || isNaN(q) || q <= 0 || !Number.isInteger(q))
+      errs.quorumMinimo = "Quórum mínimo deve ser um número inteiro maior que zero.";
+
+    // Spec 50 — validação de van e motorista
+    if (!isEdit && !vanId) errs.vanId = "Selecione uma van";
+    if (!isEdit && !motoristaId) errs.motoristaId = "Selecione um motorista";
 
     return errs;
   }
@@ -89,16 +110,11 @@ export function ViagemForm({ viagem, onSubmit, submitLabel }: ViagemFormProps) {
         nomeEvento: nomeEvento.trim(),
         dataEvento: new Date(dataEvento).toISOString(),
         localEvento: localEvento.trim(),
-        origemDescricao: origemDescricao.trim(),
-        origemCidade: origemCidade.trim(),
-        origemEstado: origemEstado.trim().toUpperCase(),
-        destinoDescricao: destinoDescricao.trim(),
-        destinoCidade: destinoCidade.trim(),
-        destinoEstado: destinoEstado.trim().toUpperCase(),
-        dataSaida: new Date(dataSaida).toISOString(),
-        dataChegada: new Date(dataChegada).toISOString(),
+        dataPartida: new Date(dataPartida).toISOString(),
+        localPartida: localPartida.trim(),
         precoAssento: Number(precoAssento),
         possuiIngresso,
+        quorumMinimo: Number(quorumMinimo),
       };
       await onSubmit(body);
     } catch (err: unknown) {
@@ -117,6 +133,9 @@ export function ViagemForm({ viagem, onSubmit, submitLabel }: ViagemFormProps) {
   const inputClass =
     "w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-van-amber focus:outline-none focus:ring-1 focus:ring-van-amber";
   const errorClass = "mt-1 text-xs text-red-400";
+
+  const submitDisabled =
+    loading || (!isEdit && (vans.length === 0 || motoristas.length === 0));
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5" noValidate>
@@ -167,157 +186,75 @@ export function ViagemForm({ viagem, onSubmit, submitLabel }: ViagemFormProps) {
         {errors.localEvento && <p className={errorClass}>{errors.localEvento}</p>}
       </div>
 
-      {/* Origem */}
-      <fieldset className="rounded-xl border border-zinc-800 p-4">
-        <legend className="text-sm font-semibold text-zinc-300">Origem</legend>
-        <div className="mt-3 space-y-4">
+      {/* Local de Partida */}
+      <div>
+        <label htmlFor="localPartida" className="mb-1 block text-sm font-medium text-zinc-300">
+          Local de partida
+        </label>
+        <input
+          id="localPartida"
+          type="text"
+          className={`${inputClass} ${errors.localPartida ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+          value={localPartida}
+          onChange={(e) => setLocalPartida(e.target.value)}
+          placeholder="Ex: Rodoviária Central, Rio de Janeiro - RJ"
+        />
+        {errors.localPartida && <p className={errorClass}>{errors.localPartida}</p>}
+      </div>
+
+      {/* Data e hora de partida */}
+      <div>
+        <label htmlFor="dataPartida" className="mb-1 block text-sm font-medium text-zinc-300">
+          Data e hora de partida
+        </label>
+        <input
+          id="dataPartida"
+          type="datetime-local"
+          className={`${inputClass} ${errors.dataPartida ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+          value={dataPartida}
+          onChange={(e) => setDataPartida(e.target.value)}
+        />
+        {errors.dataPartida && <p className={errorClass}>{errors.dataPartida}</p>}
+      </div>
+
+      {/* Preço + Quórum (apenas criação) */}
+      {!isEdit && (
+        <>
           <div>
-            <label htmlFor="origemDescricao" className="mb-1 block text-xs text-zinc-400">
-              Descrição
+            <label htmlFor="precoAssento" className="mb-1 block text-sm font-medium text-zinc-300">
+              Preço do assento (R$)
             </label>
             <input
-              id="origemDescricao"
-              type="text"
-              className={`${inputClass} ${errors.origemDescricao ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
-              value={origemDescricao}
-              onChange={(e) => setOrigemDescricao(e.target.value)}
-              placeholder="Ex: Rodoviária Central"
+              id="precoAssento"
+              type="number"
+              step="0.01"
+              min="0.01"
+              className={`${inputClass} ${errors.precoAssento ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+              value={precoAssento}
+              onChange={(e) => setPrecoAssento(e.target.value)}
+              placeholder="0,00"
             />
-            {errors.origemDescricao && <p className={errorClass}>{errors.origemDescricao}</p>}
+            {errors.precoAssento && <p className={errorClass}>{errors.precoAssento}</p>}
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2">
-              <label htmlFor="origemCidade" className="mb-1 block text-xs text-zinc-400">
-                Cidade
-              </label>
-              <input
-                id="origemCidade"
-                type="text"
-                className={`${inputClass} ${errors.origemCidade ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
-                value={origemCidade}
-                onChange={(e) => setOrigemCidade(e.target.value)}
-                placeholder="Rio de Janeiro"
-              />
-              {errors.origemCidade && <p className={errorClass}>{errors.origemCidade}</p>}
-            </div>
-            <div>
-              <label htmlFor="origemEstado" className="mb-1 block text-xs text-zinc-400">
-                UF
-              </label>
-              <input
-                id="origemEstado"
-                type="text"
-                maxLength={2}
-                className={`${inputClass} ${errors.origemEstado ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
-                value={origemEstado}
-                onChange={(e) => setOrigemEstado(e.target.value.toUpperCase())}
-                placeholder="RJ"
-              />
-              {errors.origemEstado && <p className={errorClass}>{errors.origemEstado}</p>}
-            </div>
-          </div>
-        </div>
-      </fieldset>
 
-      {/* Destino */}
-      <fieldset className="rounded-xl border border-zinc-800 p-4">
-        <legend className="text-sm font-semibold text-zinc-300">Destino</legend>
-        <div className="mt-3 space-y-4">
           <div>
-            <label htmlFor="destinoDescricao" className="mb-1 block text-xs text-zinc-400">
-              Descrição
+            <label htmlFor="quorumMinimo" className="mb-1 block text-sm font-medium text-zinc-300">
+              Quórum mínimo de passageiros
             </label>
             <input
-              id="destinoDescricao"
-              type="text"
-              className={`${inputClass} ${errors.destinoDescricao ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
-              value={destinoDescricao}
-              onChange={(e) => setDestinoDescricao(e.target.value)}
-              placeholder="Ex: Estádio Y"
+              id="quorumMinimo"
+              type="number"
+              step="1"
+              min="1"
+              className={`${inputClass} ${errors.quorumMinimo ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+              value={quorumMinimo}
+              onChange={(e) => setQuorumMinimo(e.target.value)}
+              placeholder="Ex: 20"
             />
-            {errors.destinoDescricao && <p className={errorClass}>{errors.destinoDescricao}</p>}
+            {errors.quorumMinimo && <p className={errorClass}>{errors.quorumMinimo}</p>}
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2">
-              <label htmlFor="destinoCidade" className="mb-1 block text-xs text-zinc-400">
-                Cidade
-              </label>
-              <input
-                id="destinoCidade"
-                type="text"
-                className={`${inputClass} ${errors.destinoCidade ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
-                value={destinoCidade}
-                onChange={(e) => setDestinoCidade(e.target.value)}
-                placeholder="São Paulo"
-              />
-              {errors.destinoCidade && <p className={errorClass}>{errors.destinoCidade}</p>}
-            </div>
-            <div>
-              <label htmlFor="destinoEstado" className="mb-1 block text-xs text-zinc-400">
-                UF
-              </label>
-              <input
-                id="destinoEstado"
-                type="text"
-                maxLength={2}
-                className={`${inputClass} ${errors.destinoEstado ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
-                value={destinoEstado}
-                onChange={(e) => setDestinoEstado(e.target.value.toUpperCase())}
-                placeholder="SP"
-              />
-              {errors.destinoEstado && <p className={errorClass}>{errors.destinoEstado}</p>}
-            </div>
-          </div>
-        </div>
-      </fieldset>
-
-      {/* Data de Saída */}
-      <div>
-        <label htmlFor="dataSaida" className="mb-1 block text-sm font-medium text-zinc-300">
-          Data e hora de saída
-        </label>
-        <input
-          id="dataSaida"
-          type="datetime-local"
-          className={`${inputClass} ${errors.dataSaida ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
-          value={dataSaida}
-          onChange={(e) => setDataSaida(e.target.value)}
-        />
-        {errors.dataSaida && <p className={errorClass}>{errors.dataSaida}</p>}
-      </div>
-
-      {/* Data de Chegada */}
-      <div>
-        <label htmlFor="dataChegada" className="mb-1 block text-sm font-medium text-zinc-300">
-          Data e hora de chegada
-        </label>
-        <input
-          id="dataChegada"
-          type="datetime-local"
-          className={`${inputClass} ${errors.dataChegada ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
-          value={dataChegada}
-          onChange={(e) => setDataChegada(e.target.value)}
-        />
-        {errors.dataChegada && <p className={errorClass}>{errors.dataChegada}</p>}
-      </div>
-
-      {/* Preço do Assento */}
-      <div>
-        <label htmlFor="precoAssento" className="mb-1 block text-sm font-medium text-zinc-300">
-          Preço do assento (R$)
-        </label>
-        <input
-          id="precoAssento"
-          type="number"
-          step="0.01"
-          min="0.01"
-          className={`${inputClass} ${errors.precoAssento ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
-          value={precoAssento}
-          onChange={(e) => setPrecoAssento(e.target.value)}
-          placeholder="0,00"
-        />
-        {errors.precoAssento && <p className={errorClass}>{errors.precoAssento}</p>}
-      </div>
+        </>
+      )}
 
       {/* Possui Ingresso */}
       <div className="flex items-center gap-3">
@@ -333,6 +270,120 @@ export function ViagemForm({ viagem, onSubmit, submitLabel }: ViagemFormProps) {
         </label>
       </div>
 
+      {/* ── Spec 50: Seção Van (apenas criação) ── */}
+      {!isEdit && (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-zinc-300">
+            Selecione a van para esta viagem
+          </label>
+
+          {loadingRecursos && (
+            <div className="flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-van-amber border-t-transparent" />
+              <span className="text-sm text-zinc-500">Carregando vans…</span>
+            </div>
+          )}
+
+          {!loadingRecursos && erroRecursos && (
+            <div className="rounded-lg border border-red-700/60 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+              {erroRecursos}{" "}
+              <button
+                type="button"
+                onClick={onRetryRecursos}
+                className="font-semibold underline hover:text-red-200"
+              >
+                Tentar novamente
+              </button>
+            </div>
+          )}
+
+          {!loadingRecursos && !erroRecursos && vans.length === 0 && (
+            <div className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-zinc-500">
+              Nenhuma van cadastrada.{" "}
+              <Link href="/gerente/vans/nova" className="font-semibold text-van-amber underline hover:text-van-amber/80">
+                Cadastre uma van primeiro.
+              </Link>
+            </div>
+          )}
+
+          {!loadingRecursos && !erroRecursos && vans.length > 0 && (
+            <>
+              <select
+                id="vanId"
+                value={vanId}
+                onChange={(e) => onVanChange(e.target.value)}
+                className={`${inputClass} ${errors.vanId ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+              >
+                <option value="">Selecione uma van…</option>
+                {vans.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.nome} — {v.modelo} ({v.placa}) — {v.capacidade} lugares
+                  </option>
+                ))}
+              </select>
+              {errors.vanId && <p className={errorClass}>{errors.vanId}</p>}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Spec 50: Seção Motorista (apenas criação) ── */}
+      {!isEdit && (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-zinc-300">
+            Selecione o motorista para esta viagem
+          </label>
+
+          {loadingRecursos && (
+            <div className="flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-van-amber border-t-transparent" />
+              <span className="text-sm text-zinc-500">Carregando motoristas…</span>
+            </div>
+          )}
+
+          {!loadingRecursos && erroRecursos && (
+            <div className="rounded-lg border border-red-700/60 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+              {erroRecursos}{" "}
+              <button
+                type="button"
+                onClick={onRetryRecursos}
+                className="font-semibold underline hover:text-red-200"
+              >
+                Tentar novamente
+              </button>
+            </div>
+          )}
+
+          {!loadingRecursos && !erroRecursos && motoristas.length === 0 && (
+            <div className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-zinc-500">
+              Nenhum motorista cadastrado.{" "}
+              <Link href="/gerente/motoristas/novo" className="font-semibold text-van-amber underline hover:text-van-amber/80">
+                Cadastre um motorista primeiro.
+              </Link>
+            </div>
+          )}
+
+          {!loadingRecursos && !erroRecursos && motoristas.length > 0 && (
+            <>
+              <select
+                id="motoristaId"
+                value={motoristaId}
+                onChange={(e) => onMotoristaChange(e.target.value)}
+                className={`${inputClass} ${errors.motoristaId ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+              >
+                <option value="">Selecione um motorista…</option>
+                {motoristas.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nome} — CNH: {m.cnh}
+                  </option>
+                ))}
+              </select>
+              {errors.motoristaId && <p className={errorClass}>{errors.motoristaId}</p>}
+            </>
+          )}
+        </div>
+      )}
+
       {/* API error */}
       {errors.api && (
         <div className="rounded-lg border border-red-700/60 bg-red-950/40 px-4 py-3 text-sm text-red-300">
@@ -340,7 +391,7 @@ export function ViagemForm({ viagem, onSubmit, submitLabel }: ViagemFormProps) {
         </div>
       )}
 
-      <VbButton type="submit" disabled={loading} className="w-full">
+      <VbButton type="submit" disabled={submitDisabled} className="w-full">
         {loading ? "Salvando…" : submitLabel}
       </VbButton>
     </form>

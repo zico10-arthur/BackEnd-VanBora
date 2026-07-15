@@ -8,7 +8,7 @@ import { Header } from "@/components/Header";
 import { GerenteGuard } from "@/app/gerente/vans/components/GerenteGuard";
 import { ViagemForm } from "../../components/ViagemForm";
 import { obterViagemGerente, atualizarViagemGerente } from "@/lib/api/viagens";
-import type { CriarViagemRequest, ViagemGerenteResponse } from "@/lib/api/types";
+import type { CriarViagemRequest, AtualizarViagemRequest, ViagemGerenteResponse } from "@/lib/api/types";
 
 export default function EditarViagemPage({
   params,
@@ -41,7 +41,15 @@ export default function EditarViagemPage({
   }, [viagemId, router]);
 
   async function handleSubmit(data: CriarViagemRequest) {
-    await atualizarViagemGerente(viagemId, data);
+    const body: AtualizarViagemRequest = {
+      nomeEvento: data.nomeEvento,
+      dataEvento: data.dataEvento,
+      localEvento: data.localEvento,
+      dataPartida: data.dataPartida,
+      localPartida: data.localPartida,
+      possuiIngresso: data.possuiIngresso,
+    };
+    await atualizarViagemGerente(viagemId, body);
     router.push("/gerente/viagens?sucesso=editada");
   }
 
@@ -84,10 +92,18 @@ export default function EditarViagemPage({
           onSubmit={handleSubmit}
           submitLabel="Salvar alterações"
         />
-        <div className="mt-4 text-center">
+        <div className="mt-4 text-center space-y-3">
           <VbButton variant="ghost" onClick={() => router.push("/gerente/viagens")}>
             Cancelar
           </VbButton>
+          <div>
+            <VbButton
+              variant="secondary"
+              onClick={() => router.push(`/gerente/viagens/${viagemId}/alocar`)}
+            >
+              Gerenciar alocações
+            </VbButton>
+          </div>
         </div>
       </main>
     </GerenteGuard>
