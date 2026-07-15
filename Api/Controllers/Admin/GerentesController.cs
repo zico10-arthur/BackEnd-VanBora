@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VanBora.Application.DTOs.Admin;
+using VanBora.Application.Helpers;
 using VanBora.Application.Interfaces;
 using VanBora.Domain.Common;
 using VanBora.Domain.Enums;
@@ -113,8 +114,7 @@ public class GerentesController : ControllerBase
 
     private IActionResult? ValidarAdmin()
     {
-        var tipoClaim = User.FindFirst("tipos")?.Value;
-        if (tipoClaim != TipoUsuario.Admin.ToString())
+        if (!ClaimsHelper.TemTipo(User, TipoUsuario.Admin.ToString()))
             return new ObjectResult(Result<object>.Failure(Error.Forbidden("ACESSO_NEGADO", "Acesso restrito a administradores.")));
         return null;
     }

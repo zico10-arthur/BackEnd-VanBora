@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { VanBoraLogo } from "@/components/VanBoraLogo";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { isGerenteOuMotorista } from "@/lib/auth/token";
+import { isAdmin, isGerenteOuMotorista } from "@/lib/auth/token";
 
 const navLink =
   "rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition hover:bg-white/5 hover:text-white";
@@ -44,6 +44,14 @@ export function Header() {
                   </Link>
                 </>
               ) : null}
+              {isAdmin(user.perfis) ? (
+                <Link href="/admin/dashboard" className={`${navLink} text-van-amber/90`}>
+                  Admin
+                </Link>
+              ) : null}
+              <Link href="/perfil" className={navLink}>
+                Perfil
+              </Link>
               <button
                 type="button"
                 onClick={() => {

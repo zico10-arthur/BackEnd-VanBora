@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { isGerenteOuMotorista } from "@/lib/auth/token";
+import { isAdmin, isGerenteOuMotorista } from "@/lib/auth/token";
 
 type Props = {
   onNavigate?: () => void;
@@ -94,6 +94,14 @@ export function MobileNav({ onNavigate }: Props) {
                       </Link>
                     </>
                   ) : null}
+                  {isAdmin(user.perfis) ? (
+                    <Link href="/admin/dashboard" className={linkClass} onClick={close}>
+                      Admin
+                    </Link>
+                  ) : null}
+                  <Link href="/perfil" className={linkClass} onClick={close}>
+                    Perfil
+                  </Link>
                   <button
                     type="button"
                     className={`${linkClass} w-full text-left text-zinc-500`}

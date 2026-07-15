@@ -239,3 +239,131 @@ export type DashboardData = {
   receitaTotal: number;
   viagensRecentes: ViagemResumo[];
 };
+
+// ── Perfil (US18/19/20/21) ────────────────────────────────────────
+
+export type AtualizarUsuarioRequest = {
+  nome: string;
+  email: string;
+  telefone?: string | null;
+  chavePix?: string | null;
+  numeroCNH?: string | null;
+  categoriaCNH?: string | null;
+  dataValidadeCNH?: string | null;
+};
+
+export type AtualizarUsuarioResponse = {
+  usuarioId: string;
+  nome: string;
+  email: string;
+  telefone?: string | null;
+  cpf: string;
+  tipo: string;
+  slug?: string | null;
+  chavePix?: string | null;
+  numeroCNH?: string | null;
+};
+
+export type AlterarSenhaRequest = {
+  senhaAtual: string;
+  senhaNova: string;
+};
+
+export type AtualizarSlugRequest = {
+  slug: string;
+};
+
+export type SolicitarExclusaoResponse = {
+  mensagem: string;
+};
+
+export type ConfirmarExclusaoResponse = {
+  mensagem: string;
+};
+
+export type ContatoGerenteResponse = {
+  telefone: string | null;
+  possuiIngresso: boolean;
+};
+
+// ── Admin (Spec Admin) ────────────────────────────────────────────
+
+export type UsuarioAdminResponse = {
+  usuarioId: string;
+  nome: string;
+  cpf: string;
+  email: string | null;
+  tipo: string;
+  ativo: boolean;
+  totalReservas: number;
+  criadoEm: string;
+};
+
+export type GerenteAdminResponse = {
+  id: string;
+  nome: string;
+  cpf: string;
+  email: string | null;
+  telefone: string | null;
+  slug: string | null;
+  taxaPlataforma: number;
+  gratuito: boolean;
+  ativo: boolean;
+  totalVans: number;
+  totalViagens: number;
+  criadoEm: string;
+};
+
+export type CriarGerenteAdminRequest = {
+  nome: string;
+  cpf: string;
+  email: string;
+  senha: string;
+  telefone?: string | null;
+  slug: string;
+  taxaPlataforma?: number | null;
+  gratuito?: boolean | null;
+  chavePix?: string | null;
+};
+
+export type AtualizarGerenteAdminRequest = {
+  taxaPlataforma?: number | null;
+  gratuito?: boolean | null;
+  ativo?: boolean | null;
+};
+
+export type ReservaHistoricoItemResponse = {
+  assento: number;
+  passageiroNome: string;
+  passageiroDocumento: string;
+  valor: number;
+};
+
+export type ReservaHistoricoResponse = {
+  id: string;
+  status: string;
+  valorTotal: number;
+  taxaPlataforma: number;
+  criadaEm: string;
+  viagem: {
+    id: string;
+    nomeEvento: string;
+    origem: string;
+    destino: string;
+    dataPartida: string;
+  };
+  itens: ReservaHistoricoItemResponse[];
+};
+
+export type ViagemGerenteHistoricoResponse = {
+  viagemId: string;
+  nomeEvento: string;
+  origem: string;
+  destino: string;
+  dataPartida: string;
+  dataEvento: string;
+  totalReservas: number;
+  totalArrecadado: number;
+  taxaPlataforma: number;
+  statusViagem: string;
+};

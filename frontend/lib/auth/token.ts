@@ -39,3 +39,7 @@ export function getStoredUser(): StoredUser | null {
 export function isGerenteOuMotorista(perfis: string[]): boolean {
   return perfis.some((p) => ["Gerente", "Motorista", "Admin"].includes(p));
 }
+
+export function isAdmin(perfis: string[]): boolean {
+  return perfis.includes("Admin");
+}

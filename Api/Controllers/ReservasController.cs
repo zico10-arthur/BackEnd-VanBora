@@ -81,6 +81,48 @@ public class ReservasController : ControllerBase
     }
 
     /// <summary>
+    ///     Gera (ou renova) a preferência de pagamento (Checkout Pix) da reserva no Mercado Pago.
+    /// </summary>
+    [HttpPost("{reservaId:guid}/pagar")]
+    [ProducesResponseType(typeof(PagarReservaResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> PagarReserva(
+        Guid reservaId,
+        CancellationToken cancellationToken)
+    {
+        var usuarioId = ObterUsuarioId();
+        var result = await _reservaService.PagarReservaAsync(usuarioId, reservaId, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    ///     Cancela uma reserva do usuário autenticado.
+    /// </summary>
+    [HttpPost("{reservaId:guid}/cancelar")]
+    [ProducesResponseType(typeof(ReservaResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> CancelarReserva(
+        Guid reservaId,
+        CancellationToken cancellationToken)
+    {
+        var usuarioId = ObterUsuarioId();
+        var result = await _reservaService.CancelarReservaAsync(usuarioId, reservaId, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     ///     Obtém o contato do gerente para reservas de viagens que possuem ingresso (PossuiIngresso = true).
     ///     Retorna o telefone do gerente para que o passageiro possa combinar a compra do ingresso diretamente.
     /// </summary>

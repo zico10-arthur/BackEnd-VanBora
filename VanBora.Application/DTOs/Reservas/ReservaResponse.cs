@@ -8,9 +8,11 @@ public class ReservaResponse
     public string Status { get; init; } = string.Empty;
     public decimal ValorTotal { get; init; }
     public decimal TaxaPlataforma { get; init; }
+    public decimal ValorAPagar { get; init; }
     public string CodigoPix { get; init; } = string.Empty;
     public DateTime CriadoEm { get; init; }
     public DateTime ExpiraEm { get; init; }
+    public DateTime? PagoEm { get; init; }
     public List<ItemReservaResponse> Itens { get; init; } = [];
 }
 

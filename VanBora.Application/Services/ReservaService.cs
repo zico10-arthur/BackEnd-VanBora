@@ -224,6 +224,85 @@ public class ReservaService : IReservaService
         return Result<ReservaResponse>.Success(response);
     }
 
+    public async Task<Result<PagarReservaResponse>> PagarReservaAsync(
+        Guid usuarioId,
+        Guid reservaId,
+        CancellationToken cancellationToken = default)
+    {
+        var reserva = await _reservaRepo.GetByIdAsync(reservaId, cancellationToken);
+
+        if (reserva is null)
+            return Result<PagarReservaResponse>.Failure(
+                Error.NotFound("RESERVA_NAO_ENCONTRADA", "Reserva não encontrada."));
+
+        if (reserva.UsuarioId != usuarioId)
+            return Result<PagarReservaResponse>.Failure(
+                Error.Forbidden("ACESSO_NEGADO", "Você não tem permissão para pagar esta reserva."));
+
+        if (reserva.Status != StatusReserva.PendentePagamento)
+            return Result<PagarReservaResponse>.Failure(
+                Error.Validation("RESERVA_NAO_PENDENTE", "Esta reserva não está pendente de pagamento."));
+
+        if (reserva.EstaExpirada())
+            return Result<PagarReservaResponse>.Failure(
+                Error.Validation("RESERVA_EXPIRADA", "O prazo para pagamento desta reserva expirou."));
+
+        var viagem = reserva.ViagemVan.Viagem;
+        var titulo = $"VanBora — {viagem.NomeEvento}";
+
+        var preferenciaResult = await _pagamentoGateway.CriarPreferenciaAsync(
+            reserva.Id,
+            titulo,
+            reserva.ValorTotal,
+            reserva.ExpiraEm,
+            cancellationToken);
+
+        if (preferenciaResult.IsFailure)
+            return Result<PagarReservaResponse>.Failure(preferenciaResult.Error!);
+
+        var preferencia = preferenciaResult.Value;
+
+        var response = new PagarReservaResponse
+        {
+            Id = reserva.Id,
+            Status = reserva.Status.ToString(),
+            InitPoint = preferencia.InitPoint,
+            SandboxInitPoint = preferencia.SandboxInitPoint,
+            PreferenceId = preferencia.PreferenceId,
+            ValorAPagar = reserva.ValorTotal,
+            ExpiraEm = reserva.ExpiraEm
+        };
+
+        return Result<PagarReservaResponse>.Success(response);
+    }
+
+    public async Task<Result<ReservaResponse>> CancelarReservaAsync(
+        Guid usuarioId,
+        Guid reservaId,
+        CancellationToken cancellationToken = default)
+    {
+        var reserva = await _reservaRepo.GetByIdAsync(reservaId, cancellationToken);
+
+        if (reserva is null)
+            return Result<ReservaResponse>.Failure(
+                Error.NotFound("RESERVA_NAO_ENCONTRADA", "Reserva não encontrada."));
+
+        if (reserva.UsuarioId != usuarioId)
+            return Result<ReservaResponse>.Failure(
+                Error.Forbidden("ACESSO_NEGADO", "Você não tem permissão para cancelar esta reserva."));
+
+        if (reserva.Status is StatusReserva.Concluida or StatusReserva.Cancelada)
+            return Result<ReservaResponse>.Failure(
+                Error.Validation("CANCELAMENTO_INVALIDO", "Esta reserva não pode ser cancelada."));
+
+        reserva.Cancelar();
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var response = _mapper.Map<ReservaResponse>(reserva);
+        return Result<ReservaResponse>.Success(response);
+    }
+
     public async Task<Result<ContatoGerenteResponse>> ObterContatoGerenteAsync(
         Guid usuarioId,
         Guid reservaId,
