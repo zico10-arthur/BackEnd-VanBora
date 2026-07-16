@@ -4,6 +4,7 @@ using VanBora.Application.DTOs.Vans;
 using VanBora.Application.Interfaces;
 using VanBora.Domain.Common;
 using VanBora.Domain.Entities;
+using VanBora.Domain.Enums;
 using VanBora.Domain.Interfaces;
 using VanBora.Domain.ValueObjects;
 
@@ -12,17 +13,20 @@ namespace VanBora.Application.Services;
 public class VanService : IVanService
 {
     private readonly IVanRepository _vanRepository;
+    private readonly IViagemVanRepository _viagemVanRepository;
     private readonly IMapper _mapper;
     private readonly IValidator<CriarVanRequest> _criarValidator;
     private readonly IValidator<AtualizarVanRequest> _atualizarValidator;
 
     public VanService(
         IVanRepository vanRepository,
+        IViagemVanRepository viagemVanRepository,
         IMapper mapper,
         IValidator<CriarVanRequest> criarValidator,
         IValidator<AtualizarVanRequest> atualizarValidator)
     {
         _vanRepository = vanRepository;
+        _viagemVanRepository = viagemVanRepository;
         _mapper = mapper;
         _criarValidator = criarValidator;
         _atualizarValidator = atualizarValidator;
@@ -43,6 +47,18 @@ public class VanService : IVanService
         var placaResult = Placa.Criar(request.Placa);
         if (!placaResult.IsSuccess)
             return Result<VanResponse>.Failure(placaResult.Error);
+
+        // Verifica unicidade da placa
+        var vanComMesmaPlaca = await _vanRepository.GetByPlacaAsync(placaResult.Value, cancellationToken);
+        if (vanComMesmaPlaca is not null)
+            return Result<VanResponse>.Failure(
+                Error.Conflict("PLACA_EM_USO", "Esta placa já está cadastrada."));
+
+        // Verifica unicidade do nome para este gerente
+        var vansDoGerente = await _vanRepository.GetByGerenteUsuarioIdAsync(gerenteUsuarioId, cancellationToken);
+        if (vansDoGerente.Any(v => string.Equals(v.Nome, request.Nome, StringComparison.OrdinalIgnoreCase)))
+            return Result<VanResponse>.Failure(
+                Error.Conflict("NOME_EM_USO", "Você já tem uma van com este nome."));
 
         var van = new Van(gerenteUsuarioId, request.Nome, placaResult.Value, request.Modelo, request.Capacidade);
 
@@ -88,7 +104,17 @@ public class VanService : IVanService
                     Error.Conflict("PLACA_EM_USO", "Esta placa já está cadastrada para outra van."));
         }
 
-        van.AtualizarDados(request.Nome, novaPlaca, request.Modelo);
+        // Verifica unicidade do nome se foi alterado
+        var nomeMudou = !string.Equals(request.Nome, van.Nome, StringComparison.OrdinalIgnoreCase);
+        if (nomeMudou)
+        {
+            var vansDoGerente = await _vanRepository.GetByGerenteUsuarioIdAsync(gerenteUsuarioId, cancellationToken);
+            if (vansDoGerente.Any(v => v.Id != vanId && string.Equals(v.Nome, request.Nome, StringComparison.OrdinalIgnoreCase)))
+                return Result<VanResponse>.Failure(
+                    Error.Conflict("NOME_EM_USO", "Você já tem uma van com este nome."));
+        }
+
+        van.AtualizarDados(request.Nome, novaPlaca);
 
         _vanRepository.Update(van);
         await _vanRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
@@ -121,11 +147,53 @@ public class VanService : IVanService
         if (van is null)
             return Result<bool>.Failure(Error.NotFound("VAN_NAO_ENCONTRADA", "Van não encontrada."));
 
+        // Valida se a van está alocada em viagens futuras
+        var alocacoes = await _viagemVanRepository.GetByVanIdAsync(vanId, cancellationToken);
+        var temViagemFutura = alocacoes
+            .Any(vv => vv.Viagem.DataPartida > DateTime.UtcNow
+                       && vv.Viagem.Status != StatusViagem.Cancelada);
+
+        if (temViagemFutura)
+            return Result<bool>.Failure(
+                Error.Validation("VAN_COM_VIAGENS_FUTURAS", "Van possui viagens futuras. Remova a alocação primeiro."));
+
         van.Desativar();
 
         _vanRepository.Update(van);
         await _vanRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result<bool>.Success(true);
+    }
+
+    public async Task<Result<VanResponse>> AlternarStatusAsync(Guid gerenteUsuarioId, Guid vanId, CancellationToken cancellationToken = default)
+    {
+        var van = await _vanRepository.GetByIdAndGerenteAsync(vanId, gerenteUsuarioId, cancellationToken);
+        if (van is null)
+            return Result<VanResponse>.Failure(Error.NotFound("VAN_NAO_ENCONTRADA", "Van não encontrada."));
+
+        if (van.Ativo)
+        {
+            // Valida se a van está alocada em viagens futuras antes de desativar
+            var alocacoes = await _viagemVanRepository.GetByVanIdAsync(vanId, cancellationToken);
+            var temViagemFutura = alocacoes
+                .Any(vv => vv.Viagem.DataPartida > DateTime.UtcNow
+                           && vv.Viagem.Status != StatusViagem.Cancelada);
+
+            if (temViagemFutura)
+                return Result<VanResponse>.Failure(
+                    Error.Validation("VAN_COM_VIAGENS_FUTURAS", "Van possui viagens futuras. Remova a alocação primeiro."));
+
+            van.Desativar();
+        }
+        else
+        {
+            van.Ativar();
+        }
+
+        _vanRepository.Update(van);
+        await _vanRepository.UnitOfWork.SaveChangesAsync(cancellationToken);
+
+        var response = _mapper.Map<VanResponse>(van);
+        return Result<VanResponse>.Success(response);
     }
 }

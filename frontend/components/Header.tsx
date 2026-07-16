@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { VanBoraLogo } from "@/components/VanBoraLogo";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { isGerenteOuMotorista } from "@/lib/auth/token";
+import { isAdmin, isGerenteOuMotorista } from "@/lib/auth/token";
 
 const navLink =
   "rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition hover:bg-white/5 hover:text-white";
@@ -29,10 +29,29 @@ export function Header() {
                 Minhas reservas
               </Link>
               {isGerenteOuMotorista(user.perfis) ? (
-                <Link href="/motorista/nova-viagem" className={`${navLink} text-van-amber/90`}>
-                  Painel
+                <>
+                  <Link href="/gerente/dashboard" className={`${navLink} text-van-amber/90`}>
+                    Dashboard
+                  </Link>
+                  <Link href="/gerente/viagens" className={navLink}>
+                    Minhas Viagens
+                  </Link>
+                  <Link href="/gerente/vans" className={navLink}>
+                    Minhas Vans
+                  </Link>
+                  <Link href="/gerente/motoristas" className={navLink}>
+                    Motoristas
+                  </Link>
+                </>
+              ) : null}
+              {isAdmin(user.perfis) ? (
+                <Link href="/admin/dashboard" className={`${navLink} text-van-amber/90`}>
+                  Admin
                 </Link>
               ) : null}
+              <Link href="/perfil" className={navLink}>
+                Perfil
+              </Link>
               <button
                 type="button"
                 onClick={() => {
@@ -50,7 +69,7 @@ export function Header() {
                 Entrar
               </Link>
               <Link
-                href="/cadastro/passageiro"
+                href="/cadastro"
                 className="rounded-xl bg-van-amber px-4 py-2 text-sm font-bold text-van-void transition hover:brightness-110"
               >
                 Criar conta

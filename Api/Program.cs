@@ -31,6 +31,8 @@ if (jwtSettings.SecretKey.Length < 32)
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = true; // .NET 9+: garante "sub" → NameIdentifier
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -91,6 +93,22 @@ builder.Services.AddScoped<IValidator<CriarGerenteAdminRequest>, CriarGerenteAdm
 
 
 
+// ── CORS ────────────────────────────────────────────────────────
+var corsSection = builder.Configuration.GetSection(CorsSettings.SectionName);
+builder.Services.Configure<CorsSettings>(corsSection);
+
+var corsSettings = corsSection.Get<CorsSettings>() ?? new CorsSettings();
+
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins(corsSettings.AllowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 // ── Infrastructure ──────────────────────────────────────────────
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -118,6 +136,8 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseHttpsRedirection();
+
+app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();

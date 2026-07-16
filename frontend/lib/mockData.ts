@@ -64,7 +64,7 @@ export function getSeatsForEvent(eventId: string): SeatItem[] {
         id,
         row,
         position: pos,
-        state: occupied.has(id) ? "occupied" : "available",
+        state: occupied.has(id) ? "reserved" : "available",
       });
     }
   }

@@ -89,3 +89,15 @@ export function apiGet<T>(path: string, auth = false) {
 export function apiPost<T>(path: string, body: unknown, auth = false) {
   return request<T>(path, { method: "POST", body, auth });
 }
+
+export function apiPut<T>(path: string, body: unknown, auth = false) {
+  return request<T>(path, { method: "PUT", body, auth });
+}
+
+export function apiDelete<T>(path: string, auth = false) {
+  return request<T>(path, { method: "DELETE", auth });
+}
+
+export function apiPatch<T>(path: string, body: unknown, auth = false) {
+  return request<T>(path, { method: "PATCH", body, auth });
+}

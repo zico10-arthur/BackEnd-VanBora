@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { isGerenteOuMotorista } from "@/lib/auth/token";
+import { isAdmin, isGerenteOuMotorista } from "@/lib/auth/token";
 
 type Props = {
   onNavigate?: () => void;
@@ -79,10 +79,29 @@ export function MobileNav({ onNavigate }: Props) {
                     Minhas reservas
                   </Link>
                   {isGerenteOuMotorista(user.perfis) ? (
-                    <Link href="/motorista/nova-viagem" className={linkClass} onClick={close}>
-                      Painel do frotista
+                    <>
+                      <Link href="/gerente/dashboard" className={linkClass} onClick={close}>
+                        Dashboard
+                      </Link>
+                      <Link href="/gerente/viagens" className={linkClass} onClick={close}>
+                        Minhas Viagens
+                      </Link>
+                      <Link href="/gerente/vans" className={linkClass} onClick={close}>
+                        Minhas Vans
+                      </Link>
+                      <Link href="/gerente/motoristas" className={linkClass} onClick={close}>
+                        Motoristas
+                      </Link>
+                    </>
+                  ) : null}
+                  {isAdmin(user.perfis) ? (
+                    <Link href="/admin/dashboard" className={linkClass} onClick={close}>
+                      Admin
                     </Link>
                   ) : null}
+                  <Link href="/perfil" className={linkClass} onClick={close}>
+                    Perfil
+                  </Link>
                   <button
                     type="button"
                     className={`${linkClass} w-full text-left text-zinc-500`}
@@ -100,7 +119,7 @@ export function MobileNav({ onNavigate }: Props) {
                     Entrar
                   </Link>
                   <Link
-                    href="/cadastro/passageiro"
+                    href="/cadastro"
                     className="mt-2 block rounded-xl bg-van-amber px-4 py-3.5 text-center text-base font-bold text-van-void"
                     onClick={close}
                   >

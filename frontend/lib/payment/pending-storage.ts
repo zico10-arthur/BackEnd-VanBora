@@ -5,6 +5,8 @@ export type PendingReservaCheckout = {
   eventName: string;
   seatLabel: string;
   valorAPagar: number;
+  viagemVanId?: string;
+  expiraEm?: string;
 };
 
 export function savePendingCheckout(data: PendingReservaCheckout): void {

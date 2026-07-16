@@ -485,3 +485,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# DsCode tool folder (local AI assistant, not part of the project)
+DSCODE/

@@ -9,10 +9,11 @@
 | Spec # | Nome | Status | O que faz | Referência no visão.md |
 |--------|------|--------|-----------|------------------------|
 | 10 | Dashboard do Gerente | 🔴 pendente | Portal inicial pós-login com visão geral das viagens ativas, reservas e ocupação | Item 10 — Dashboard |
-| 20 | Gerenciamento de Viagens | 🔴 pendente | Criar, listar, editar, cancelar viagens (evento + van + motorista + rota) | Item 6 — Viagens |
-| 30 | Gerenciamento de Vans | 🔴 pendente | Listar, cadastrar, editar, remover vans com validação de placa, ano, capacidade | Item 3 — Vans |
-| 40 | Gerenciamento de Motoristas | 🔴 pendente | Listar, cadastrar, editar, remover motoristas com validação de CPF, CNH, idade | Item 2 — Motoristas |
-| 50 | Alocação de Recursos à Viagem | 🔴 pendente | Alocar/remover van e motorista a uma viagem específica | Item 6 — Viagens |
+| 20 | Gerenciamento de Viagens | 🟢 auditada | Criar, listar, editar, cancelar viagens (evento + van + motorista + rota) | Item 6 — Viagens |
+| 21 | Correções na Criação de Viagens | 🟢 auditada | Alinhar frontend com DTOs reais do backend (localPartida, quorumMinimo) | Spec 20 — Viagens |
+| 30 | Gerenciamento de Vans | 🟢 auditada | Listar, cadastrar, editar, remover vans com validação de placa, ano, capacidade | Item 3 — Vans |
+| 40 | Gerenciamento de Motoristas | 🟢 auditada | Listar, cadastrar, editar, remover motoristas com validação de CPF, CNH, idade | Item 2 — Motoristas |
+| 50 | Alocação de Recursos à Viagem | 🟢 auditada | Alocar/remover van e motorista a uma viagem específica | Item 6 — Viagens |
 | 60 | Relatório Financeiro da Viagem | 🔴 pendente | Visualizar receita, ocupação, break-even e lista de embarque por viagem | Item 10 — Dashboard |
 
 ---
@@ -22,7 +23,8 @@
 | Status | Significado |
 |--------|-------------|
 | 🔴 pendente | Spec criada, frontend não iniciado |
-| 🟡 implementada | Código frontend concluído e integrado com backend |
+| 🟡 verified | Spec verificada — documentos completos, determinísticos e prontos para implementação |
+| 🟠 implementada | Código frontend concluído e integrado com backend |
 | 🟢 auditada | Testada, revisada e aprovada em produção |
 
 ---
@@ -39,6 +41,9 @@ Spec 20 — Gerenciamento de Viagens
   ├── depende de: Spec 30 (precisa de vans cadastradas)
   ├── depende de: Spec 40 (precisa de motoristas cadastrados)
   └── depende de: Spec 50 (alocação de van/motorista)
+
+Spec 21 — Correções na Criação de Viagens
+  └── depende de: Spec 20 (corrige a implementação existente)
 
 Spec 30 — Gerenciamento de Vans
   └── sem dependências (CRUD isolado)

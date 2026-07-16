@@ -29,7 +29,7 @@ public class Van
         Guard.AgainstNullOrWhiteSpace(nome, nameof(nome));
         Guard.AgainstNull(placa, nameof(placa));
         Guard.AgainstNullOrWhiteSpace(modelo, nameof(modelo));
-        Guard.AgainstLessThan(capacidade, 2, nameof(capacidade)); // mínimo: 1 motorista + 1 passageiro
+        Guard.AgainstLessThan(capacidade, 9, nameof(capacidade)); // mínimo: 1 motorista + 8 passageiros
 
         Id = Guid.NewGuid();
         GerenteUsuarioId = gerenteUsuarioId;
@@ -41,15 +41,13 @@ public class Van
         CriadoEm = DateTime.UtcNow;
     }
 
-    public void AtualizarDados(string nome, Placa placa, string modelo)
+    public void AtualizarDados(string nome, Placa placa)
     {
         Guard.AgainstNullOrWhiteSpace(nome, nameof(nome));
         Guard.AgainstNull(placa, nameof(placa));
-        Guard.AgainstNullOrWhiteSpace(modelo, nameof(modelo));
 
         Nome = nome;
         Placa = placa;
-        Modelo = modelo;
     }
 
     public void Ativar()

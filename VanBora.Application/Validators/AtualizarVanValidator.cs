@@ -16,9 +16,5 @@ public sealed class AtualizarVanValidator : AbstractValidator<AtualizarVanReques
             .NotEmpty()
             .Must(placa => Placa.Criar(placa).IsSuccess)
             .WithMessage("Placa inválida. Formatos aceitos: ABC1D23 (Mercosul) ou ABC-1234 (cinza).");
-
-        RuleFor(x => x.Modelo)
-            .NotEmpty()
-            .MaximumLength(100);
     }
 }

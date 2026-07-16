@@ -10,6 +10,7 @@ public sealed class ReservaProfile : Profile
     {
         CreateMap<Reserva, ReservaResponse>()
             .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
+            .ForMember(dest => dest.ValorAPagar, opt => opt.MapFrom(src => src.ValorTotal))
             .ForMember(dest => dest.Itens, opt => opt.MapFrom(src => src.Itens));
 
         CreateMap<ItemReserva, ItemReservaResponse>()

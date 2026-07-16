@@ -113,6 +113,23 @@ public class VansController : ControllerBase
         return Ok(result.Value);
     }
 
+    /// <summary>
+    ///     Alterna o status ativo/inativo de uma van.
+    /// </summary>
+    [HttpPatch("{vanId:guid}/status")]
+    [ProducesResponseType(typeof(VanResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AlternarStatus(Guid vanId, CancellationToken cancellationToken)
+    {
+        var gerenteId = ObterGerenteId();
+        var result = await _vanService.AlternarStatusAsync(gerenteId, vanId, cancellationToken);
+
+        if (result.IsFailure)
+            return new ObjectResult(result);
+
+        return Ok(result.Value);
+    }
+
     private Guid ObterGerenteId()
     {
         var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value

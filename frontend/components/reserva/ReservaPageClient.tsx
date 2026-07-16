@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
+import { ReservationHoldChip } from "@/components/reserva/ReservationHoldChip";
 import { SeatBookingClient } from "@/components/SeatBookingClient";
 import { TripHeroPanel } from "@/components/TripHeroPanel";
 import { obterDetalheViagemVan } from "@/lib/api/viagens";
@@ -65,10 +66,13 @@ export function ReservaPageClient({ viagemVanId }: { viagemVanId: string }) {
     <div className="relative min-h-screen bg-van-void">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_45%_at_50%_-5%,rgba(240,165,0,0.08),transparent_60%)]" />
       <Header />
-      <main className="relative mx-auto max-w-5xl px-4 py-6 pb-32 sm:px-6 sm:py-8 sm:pb-36">
+      <main className="relative mx-auto max-w-6xl px-4 py-6 pb-32 sm:px-6 sm:py-8 sm:pb-36 lg:max-w-7xl">
         <Link href="/#viagens" className="text-sm font-medium text-zinc-500 transition hover:text-van-amber">
           ← Voltar às viagens
         </Link>
+        <div className="mt-4">
+          <ReservationHoldChip viagemVanId={trip.viagemVanId} />
+        </div>
         <TripHeroPanel
           title={trip.nomeEvento}
           subtitle={`${trip.localPartida} → ${trip.localEvento}`}

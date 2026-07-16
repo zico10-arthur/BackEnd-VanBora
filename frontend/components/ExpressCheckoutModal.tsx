@@ -139,6 +139,8 @@ export function ExpressCheckoutModal({
         eventName,
         seatLabel,
         valorAPagar: pagamento.valorAPagar,
+        viagemVanId,
+        expiraEm: pagamento.expiraEm,
       });
 
       window.location.href = url;
