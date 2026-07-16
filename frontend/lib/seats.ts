@@ -32,7 +32,7 @@ export function buildSeatMap(capacidade: number, ocupados: number[]): SeatItem[]
       id: label,
       row,
       position,
-      state: occupied.has(n) ? "occupied" : "available",
+      state: occupied.has(n) ? "reserved" : "available",
     });
   }
   return seats;

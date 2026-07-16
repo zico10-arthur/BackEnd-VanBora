@@ -10,7 +10,7 @@ export interface EventItem {
   coverImage: string;
 }
 
-export type SeatState = "available" | "occupied";
+export type SeatState = "available" | "reserved" | "unavailable";
 
 export interface SeatItem {
   id: string;

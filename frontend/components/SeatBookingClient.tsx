@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import type { ViagemVanDetalhe } from "@/lib/api/types";
 import type { SeatItem } from "@/lib/types";
-import { BookingBar } from "./BookingBar";
+import { BookingPanel } from "./BookingPanel";
 import { ExpressCheckoutModal } from "./ExpressCheckoutModal";
 import { SeatMap } from "./SeatMap";
 
@@ -17,7 +17,7 @@ export function SeatBookingClient({ trip, seats }: Props) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   const onSelect = useCallback((seat: SeatItem) => {
-    if (seat.state === "occupied") return;
+    if (seat.state !== "available") return;
     setSelectedId((prev) => (prev === seat.id ? null : seat.id));
   }, []);
 
@@ -26,14 +26,23 @@ export function SeatBookingClient({ trip, seats }: Props) {
     setCheckoutOpen(true);
   }, [selectedId]);
 
-  const ticketPrice = trip.precoAssento;
+  const bookingProps = {
+    eventName: trip.nomeEvento,
+    localPartida: trip.localPartida,
+    precoAssento: trip.precoAssento,
+    selectedSeatLabel: selectedId,
+    onAdvance,
+  };
 
   return (
     <>
-      <div className="pb-36">
-        <SeatMap seats={seats} selectedId={selectedId} onSelect={onSelect} />
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] lg:items-start lg:gap-8 xl:gap-10">
+        <div className="pb-36 lg:pb-0">
+          <SeatMap seats={seats} selectedId={selectedId} onSelect={onSelect} />
+        </div>
+        <BookingPanel {...bookingProps} variant="panel" />
       </div>
-      <BookingBar selectedSeatLabel={selectedId} onAdvance={onAdvance} />
+      <BookingPanel {...bookingProps} variant="bar" />
       <ExpressCheckoutModal
         open={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
@@ -43,7 +52,7 @@ export function SeatBookingClient({ trip, seats }: Props) {
         departureLocation={trip.localPartida}
         vehicleModelColor={trip.modeloVan}
         vehiclePlate={trip.placaVan}
-        ticketPrice={ticketPrice}
+        ticketPrice={trip.precoAssento}
       />
     </>
   );

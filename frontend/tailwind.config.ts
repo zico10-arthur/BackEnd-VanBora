@@ -11,12 +11,22 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-inter)", "system-ui", "sans-serif"],
+      },
+      borderRadius: {
+        vb: "12px",
+      },
+      maxWidth: {
+        container: "1280px",
       },
       colors: {
-        "van-void": "#0D0D0D",
+        "van-void": "#0A0A0A",
+        "van-surface": "#141414",
+        "van-elevated": "#1C1C1C",
+        "van-border": "#2A2A2A",
         "van-amber": "#F0A500",
         "van-gold": "#FFE08A",
-        "van-card": "#1A1A1A",
+        "van-card": "#1C1C1C",
         "van-seat-occupied": "#2A2A2A",
       },
       boxShadow: {

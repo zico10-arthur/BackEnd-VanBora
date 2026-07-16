@@ -1,6 +1,6 @@
 "use client";
 
-import type { SeatItem } from "@/lib/types";
+import type { SeatItem, SeatState } from "@/lib/types";
 
 interface SeatMapProps {
   seats: SeatItem[];
@@ -19,16 +19,20 @@ function groupByRow(seats: SeatItem[]) {
   return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
 }
 
+function isSelectable(state: SeatState): boolean {
+  return state === "available";
+}
+
 export function SeatMap({ seats, selectedId, onSelect }: SeatMapProps) {
   const rows = groupByRow(seats);
 
   return (
     <div className="mx-auto w-full max-w-md">
       <div
-        className="relative mb-4 overflow-hidden rounded-xl border border-transparent bg-gradient-to-br from-[#fff6d4]/25 via-[#f0a500]/15 to-[#2a1a00]/40 p-px shadow-[0_0_24px_rgba(0,0,0,0.35)]"
+        className="relative mb-4 overflow-hidden rounded-vb border border-van-border bg-gradient-to-br from-van-amber/10 via-van-amber/5 to-van-void/80 p-px shadow-[0_0_24px_rgba(0,0,0,0.35)]"
         aria-hidden
       >
-        <div className="rounded-[11px] bg-[#0D0D0D]/90 px-3 py-2.5 text-center text-[11px] font-bold uppercase tracking-[0.28em] text-[#f0a500]/80">
+        <div className="rounded-[11px] bg-van-void/90 px-3 py-2.5 text-center text-[11px] font-bold uppercase tracking-[0.28em] text-van-amber/80">
           Frente da van
         </div>
       </div>
@@ -51,7 +55,7 @@ export function SeatMap({ seats, selectedId, onSelect }: SeatMapProps) {
                 />
               ))}
               <div
-                className="vb-seat-dead flex items-center justify-center rounded-md border border-white/[0.07] opacity-90"
+                className="vb-seat-dead flex items-center justify-center rounded-md border border-van-border opacity-90"
                 aria-hidden
               />
               {right.map((seat) => (
@@ -67,17 +71,21 @@ export function SeatMap({ seats, selectedId, onSelect }: SeatMapProps) {
         })}
       </div>
 
-      <ul className="mt-6 flex flex-wrap justify-center gap-4 text-xs text-neutral-500">
+      <ul className="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-zinc-500">
         <li className="flex items-center gap-2">
-          <span className="h-4 w-4 rounded border border-neutral-400/40 bg-neutral-100 shadow-inner" />
+          <span className="h-4 w-4 rounded border-2 border-van-amber/70 bg-van-void" />
           Livre
         </li>
         <li className="flex items-center gap-2">
-          <span className="vb-seat-dead h-4 w-4 rounded border border-white/5" />
-          Ocupado
+          <span className="vb-seat-reserved h-4 w-4 rounded border border-zinc-600/50" />
+          Reservado
         </li>
         <li className="flex items-center gap-2">
-          <span className="vb-seat-neon h-4 w-4 rounded bg-[#F0A500]" />
+          <span className="vb-seat-dead h-4 w-4 rounded border border-van-border" />
+          Indisponível
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="vb-seat-neon h-4 w-4 rounded bg-van-amber" />
           Selecionado
         </li>
       </ul>
@@ -94,18 +102,32 @@ function SeatButton({
   selected: boolean;
   onSelect: (seat: SeatItem) => void;
 }) {
-  const occupied = seat.state === "occupied";
-
   const base =
-    "relative flex min-h-[44px] flex-col items-center justify-center rounded-lg text-sm font-bold transition-[border-color,box-shadow,background-color,transform] duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F0A500] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]";
+    "relative flex min-h-[44px] flex-col items-center justify-center rounded-vb text-sm font-bold transition-[border-color,box-shadow,background-color,transform] duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-van-amber focus-visible:ring-offset-2 focus-visible:ring-offset-van-void";
 
-  if (occupied) {
+  if (seat.state === "unavailable") {
     return (
       <button
         type="button"
         disabled
-        className={`${base} vb-seat-dead cursor-not-allowed border border-black/40 text-[#3d3d3d]`}
+        className={`${base} vb-seat-dead cursor-not-allowed border border-black/40 text-zinc-600`}
         aria-disabled
+        aria-label={`Assento ${seat.id} indisponível`}
+      >
+        {seat.id}
+      </button>
+    );
+  }
+
+  if (seat.state === "reserved") {
+    return (
+      <button
+        type="button"
+        disabled
+        title="Reservado por outro passageiro"
+        className={`${base} vb-seat-reserved cursor-not-allowed border border-zinc-600/40 text-zinc-500`}
+        aria-disabled
+        aria-label={`Assento ${seat.id} reservado por outro passageiro`}
       >
         {seat.id}
       </button>
@@ -117,20 +139,26 @@ function SeatButton({
       <button
         type="button"
         onClick={() => onSelect(seat)}
-        className={`${base} vb-seat-neon z-[1] border border-[#ffe08a]/60 bg-[#F0A500] text-[#1a0f00]`}
+        className={`${base} vb-seat-neon z-[1] border border-van-gold/60 bg-van-amber text-van-void`}
         aria-pressed="true"
+        aria-label={`Assento ${seat.id} selecionado`}
       >
         {seat.id}
       </button>
     );
   }
 
+  if (!isSelectable(seat.state)) {
+    return null;
+  }
+
   return (
     <button
       type="button"
       onClick={() => onSelect(seat)}
-      className={`${base} border-2 border-neutral-300/40 bg-neutral-100 text-[#0D0D0D] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] hover:border-[#F0A500] hover:bg-white hover:shadow-[0_0_14px_rgba(240,165,0,0.35)] active:scale-[0.97]`}
+      className={`${base} border-2 border-van-amber/70 bg-van-void text-van-amber hover:border-van-amber hover:bg-van-elevated hover:shadow-[0_0_14px_rgba(240,165,0,0.35)] active:scale-[0.97]`}
       aria-pressed="false"
+      aria-label={`Assento ${seat.id} disponível`}
     >
       {seat.id}
     </button>

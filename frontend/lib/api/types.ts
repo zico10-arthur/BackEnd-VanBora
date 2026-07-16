@@ -237,6 +237,10 @@ export type DashboardData = {
   totalReservas: number;
   ocupacaoMedia: number;
   receitaTotal: number;
+  reservasHoje: number;
+  receitaSemana: number;
+  proximaViagemEvento: string;
+  proximaViagemData: string;
   viagensRecentes: ViagemResumo[];
 };
 

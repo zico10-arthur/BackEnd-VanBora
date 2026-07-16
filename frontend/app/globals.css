@@ -10,9 +10,20 @@
   ::selection {
     @apply bg-van-amber/35 text-white;
   }
+
+  h1.font-display,
+  h2.font-display,
+  .font-display {
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
 }
 
 @layer utilities {
+  .vb-container {
+    @apply mx-auto w-full max-w-container px-4 sm:px-6;
+  }
+
   .vb-cta-gold {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.35),
@@ -28,7 +39,7 @@
   }
 
   .vb-seat-dead {
-    background-color: #2a2a2a;
+    background-color: #1a1a1a;
     background-image:
       repeating-linear-gradient(
         -22deg,
@@ -37,8 +48,19 @@
         transparent 1px,
         transparent 4px
       ),
-      linear-gradient(155deg, #383838 0%, #2a2a2a 42%, #1c1c1c 100%);
+      linear-gradient(155deg, #2a2a2a 0%, #1a1a1a 42%, #0f0f0f 100%);
     box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.65);
+  }
+
+  .vb-seat-reserved {
+    background-color: #2a2a2a;
+    background-image: repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 3px,
+      rgba(161, 161, 170, 0.35) 3px,
+      rgba(161, 161, 170, 0.35) 5px
+    );
   }
 
   .vb-seat-neon {
@@ -52,6 +74,25 @@
 
   .vb-text-gradient {
     @apply bg-gradient-to-r from-[#ffe08a] via-van-amber to-[#c77d08] bg-clip-text text-transparent;
+  }
+
+  .vb-bg-grid {
+    background-image:
+      linear-gradient(rgba(240, 165, 0, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(240, 165, 0, 0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+    background-position: center;
+    transform: skewY(-6deg);
+  }
+
+  .vb-bg-stripes {
+    background-image: repeating-linear-gradient(
+      -18deg,
+      transparent,
+      transparent 18px,
+      rgba(240, 165, 0, 0.035) 18px,
+      rgba(240, 165, 0, 0.035) 20px
+    );
   }
 }
 
